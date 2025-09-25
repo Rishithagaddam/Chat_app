@@ -7,11 +7,18 @@ const dotenv = require('dotenv');
 // Import configurations and utilities
 const connectDB = require('./config/database');
 const { handleConnection } = require('./config/socket');
+const authMiddleware = require('./middleware/authMiddleware');
 
 // Import routes
+console.log('Loading auth routes...');
 const authRoutes = require('./routes/auth');
+console.log('Loading user routes...');
 const userRoutes = require('./routes/users');
+console.log('Loading message routes...');
 const messageRoutes = require('./routes/messages');
+console.log('Loading group routes...');
+const groupRoutes = require('./routes/groups');
+console.log('All routes loaded successfully!');
 
 // Load environment variables
 dotenv.config();
@@ -45,9 +52,38 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Test route
+app.get('/api/test-server', (req, res) => {
+  res.json({ message: 'Server is updated and working', timestamp: new Date() });
+});
+
+// Debug route to check database connection and groups
+app.get('/api/debug/groups', async (req, res) => {
+  try {
+    const Group = require('./models/Group');
+    const groups = await Group.find({}).select('_id name admin createdAt').limit(10);
+    res.json({ 
+      success: true, 
+      message: 'Debug info for groups',
+      totalGroups: await Group.countDocuments({}),
+      recentGroups: groups,
+      timestamp: new Date()
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Debug endpoint failed', 
+      error: error.message 
+    });
+  }
+});
+
 // Request logging middleware
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  if (req.path.includes('/groups/') && req.params) {
+    console.log('Group request params:', req.params);
+  }
   next();
 });
 
@@ -62,21 +98,29 @@ app.get('/health', (req, res) => {
 });
 
 // API Routes
+console.log('Registering API routes...');
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/groups', groupRoutes);
+console.log('✅ API routes registered');
 
 // Handle Socket.IO connections
 handleConnection(io);
 
-// Make io accessible in routes (if needed)
+// Make io accessible in routes
 app.set('socketio', io);
 
 // 404 handler
 app.use((req, res) => {
+  console.log(`404 ERROR: Route not found - ${req.method} ${req.path}`);
+  console.log('Request URL:', req.url);
+  console.log('Request headers:', req.headers);
   res.status(404).json({
     success: false,
-    message: 'Route not found'
+    message: `Route not found: ${req.method} ${req.path}`,
+    requestedPath: req.path,
+    availableRoutes: ['/api/auth', '/api/users', '/api/messages', '/api/groups']
   });
 });
 
@@ -107,7 +151,7 @@ process.on('SIGINT', () => {
 });
 
 // Start server
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
   console.log(`

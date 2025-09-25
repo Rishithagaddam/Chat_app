@@ -294,4 +294,159 @@ router.put('/:messageId/read', authMiddleware, async (req, res) => {
   }
 });
 
+// @route   GET /api/messages/group/:groupId
+// @desc    Get all messages in a group
+// @access  Private
+router.get('/group/:groupId', authMiddleware, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const currentUserId = req.user._id;
+
+    // Check if group exists and user is a member
+    const Group = require('../models/Group');
+    const group = await Group.findById(groupId);
+    
+    if (!group) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found'
+      });
+    }
+
+    if (!group.isMember(currentUserId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not a member of this group'
+      });
+    }
+
+    // Get messages for this group
+    const messages = await Message.find({
+      group: groupId
+    })
+    .populate('sender', 'name email phoneNumber isOnline')
+    .populate('isRead.user', 'name')
+    .sort({ createdAt: 1 });
+
+    // Mark messages as read by current user
+    await Message.updateMany(
+      {
+        group: groupId,
+        sender: { $ne: currentUserId },
+        'isRead.user': { $ne: currentUserId }
+      },
+      {
+        $addToSet: {
+          isRead: { user: currentUserId }
+        }
+      }
+    );
+
+    res.json({
+      success: true,
+      count: messages.length,
+      group: group,
+      messages
+    });
+  } catch (error) {
+    console.error('Get group messages error:', error);
+    
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid group ID'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching group messages'
+    });
+  }
+});
+
+// @route   POST /api/messages/group
+// @desc    Send a message to a group
+// @access  Private
+router.post('/group', authMiddleware, async (req, res) => {
+  try {
+    const { groupId, message, messageType = 'text' } = req.body;
+    const senderId = req.user._id;
+
+    // Validation
+    if (!groupId || !message) {
+      return res.status(400).json({
+        success: false,
+        message: 'Group ID and message are required'
+      });
+    }
+
+    // Check if group exists and user is a member
+    const Group = require('../models/Group');
+    const group = await Group.findById(groupId);
+    
+    if (!group) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found'
+      });
+    }
+
+    if (!group.isMember(senderId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not a member of this group'
+      });
+    }
+
+    // Create message
+    const newMessage = new Message({
+      sender: senderId,
+      group: groupId,
+      message: message.trim(),
+      messageType,
+      isRead: [{ user: senderId }] // Mark as read by sender
+    });
+
+    await newMessage.save();
+
+    // Update group's updatedAt timestamp
+    group.updatedAt = new Date();
+    await group.save();
+
+    // Populate the message for response
+    const populatedMessage = await Message.findById(newMessage._id)
+      .populate('sender', 'name email phoneNumber isOnline')
+      .populate('group', 'name');
+
+    res.status(201).json({
+      success: true,
+      message: 'Message sent successfully',
+      data: populatedMessage
+    });
+  } catch (error) {
+    console.error('Send group message error:', error);
+    
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: errors[0]
+      });
+    }
+
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid group ID'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Server error while sending message'
+    });
+  }
+});
+
 module.exports = router;

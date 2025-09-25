@@ -199,6 +199,99 @@ const handleConnection = (io) => {
       }
     });
 
+    // Handle joining a group room
+    socket.on('joinGroup', (groupId) => {
+      socket.join(`group_${groupId}`);
+      console.log(`User ${socket.user.name} joined group: ${groupId}`);
+    });
+
+    // Handle leaving a group room
+    socket.on('leaveGroup', (groupId) => {
+      socket.leave(`group_${groupId}`);
+      console.log(`User ${socket.user.name} left group: ${groupId}`);
+    });
+
+    // Handle sending group messages
+    socket.on('sendGroupMessage', async (data) => {
+      try {
+        const { groupId, message, messageType = 'text' } = data;
+
+        // Validation
+        if (!groupId || !message) {
+          socket.emit('messageError', {
+            error: 'Group ID and message are required'
+          });
+          return;
+        }
+
+        // Check if group exists and user is a member
+        const Group = require('../models/Group');
+        const group = await Group.findById(groupId);
+        
+        if (!group || !group.isMember(userId)) {
+          socket.emit('messageError', {
+            error: 'Group not found or you are not a member'
+          });
+          return;
+        }
+
+        // Create and save message
+        const Message = require('../models/Message');
+        const newMessage = new Message({
+          sender: userId,
+          group: groupId,
+          message: message.trim(),
+          messageType,
+          isRead: [{ user: userId }] // Mark as read by sender
+        });
+
+        const savedMessage = await newMessage.save();
+
+        // Update group's updatedAt timestamp
+        group.updatedAt = new Date();
+        await group.save();
+
+        // Populate message for broadcasting
+        const populatedMessage = await Message.findById(savedMessage._id)
+          .populate('sender', 'name email phoneNumber isOnline')
+          .populate('group', 'name');
+
+        // Emit to all group members
+        io.to(`group_${groupId}`).emit('receiveGroupMessage', {
+          message: populatedMessage,
+          groupId: groupId
+        });
+
+        console.log(`Group message sent from ${socket.user.name} to group ${groupId}`);
+      } catch (error) {
+        console.error('Error sending group message:', error);
+        socket.emit('messageError', {
+          error: 'Failed to send group message'
+        });
+      }
+    });
+
+    // Handle group typing indicators
+    socket.on('groupTyping', (data) => {
+      const { groupId } = data;
+      socket.to(`group_${groupId}`).emit('userGroupTyping', {
+        userId,
+        user: socket.user,
+        groupId,
+        isTyping: true
+      });
+    });
+
+    socket.on('stopGroupTyping', (data) => {
+      const { groupId } = data;
+      socket.to(`group_${groupId}`).emit('userGroupTyping', {
+        userId,
+        user: socket.user,
+        groupId,
+        isTyping: false
+      });
+    });
+
     // Handle disconnection
     socket.on('disconnect', async () => {
       console.log(`User ${socket.user.name} disconnected`);
