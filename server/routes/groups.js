@@ -52,8 +52,8 @@ router.post('/', authMiddleware, async (req, res) => {
     }
 
     // Verify all members exist and are in admin's contacts
-    const adminUser = await User.findById(adminId).populate('contacts.user', '_id');
-    const adminContactIds = adminUser.contacts.map(c => c.user._id.toString());
+    const adminUser = await User.findById(adminId);
+    const adminContactIds = (adminUser.contacts || []).map(c => c.toString());
 
     const validMembers = [];
     for (const memberId of members) {

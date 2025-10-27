@@ -78,6 +78,21 @@ app.get('/api/debug/groups', async (req, res) => {
   }
 });
 
+// Temporary debug route for development: list users (no auth)
+app.get('/api/debug/users', async (req, res) => {
+  try {
+    const User = require('./models/User');
+    const users = await User.find({}).select('_id name email phoneNumber isOnline createdAt').limit(200);
+    res.json({
+      success: true,
+      count: users.length,
+      users
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Debug users failed', error: error.message });
+  }
+});
+
 // Request logging middleware
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
@@ -103,6 +118,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/groups', groupRoutes);
+const contactsRoutes = require('./routes/contacts');
+app.use('/api/contacts', contactsRoutes);
 console.log('✅ API routes registered');
 
 // Handle Socket.IO connections

@@ -5,6 +5,13 @@ const authMiddleware = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
+// helper to normalize identifiers
+const normalizeIdentifier = (val) => {
+  if (!val) return val;
+  const s = String(val).trim();
+  return s.includes('@') ? s.toLowerCase() : s;
+};
+
 // Generate JWT Token
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -37,15 +44,17 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // Convert email to lowercase for consistent storage
-    const normalizedEmail = email.toLowerCase().trim();
-    console.log('Checking for existing user with email:', normalizedEmail);
+    // Normalize inputs
+    const normalizedEmail = normalizeIdentifier(email);
+    const normalizedPhone = String(phoneNumber).trim();
+
+    console.log('Checking for existing user with email:', normalizedEmail, 'or phone:', normalizedPhone);
 
     // Check if user already exists
     const existingUser = await User.findOne({
       $or: [
         { email: normalizedEmail },
-        { phoneNumber }
+        { phoneNumber: normalizedPhone }
       ]
     });
 
@@ -62,7 +71,7 @@ router.post('/register', async (req, res) => {
     const user = await User.create({
       name: name.trim(),
       email: normalizedEmail,
-      phoneNumber: phoneNumber.trim(),
+      phoneNumber: normalizedPhone,
       password
     });
     console.log('User created successfully with ID:', user._id);
@@ -85,7 +94,7 @@ router.post('/register', async (req, res) => {
     });
   } catch (error) {
     console.error('Register error:', error);
-    
+
     if (error.name === 'ValidationError') {
       const errors = Object.values(error.errors).map(err => err.message);
       return res.status(400).json({
@@ -95,7 +104,7 @@ router.post('/register', async (req, res) => {
     }
 
     if (error.code === 11000) {
-      const field = Object.keys(error.keyPattern)[0];
+      const field = Object.keys(error.keyPattern || {})[0] || 'field';
       return res.status(400).json({
         success: false,
         message: `User already exists with this ${field}`
@@ -126,8 +135,9 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Convert email to lowercase if it's an email
-    const searchValue = emailOrPhone.includes('@') ? emailOrPhone.toLowerCase() : emailOrPhone;
+    // Normalize lookup value
+    const raw = String(emailOrPhone);
+    const searchValue = normalizeIdentifier(raw);
     console.log('Searching for user with:', searchValue);
 
     // Check if user exists (by email or phone)
@@ -215,7 +225,6 @@ router.get('/me', authMiddleware, async (req, res) => {
 // @access  Private
 router.post('/logout', authMiddleware, async (req, res) => {
   try {
-    // Update user offline status
     await User.findByIdAndUpdate(req.user._id, {
       isOnline: false,
       lastSeen: new Date()

@@ -13,12 +13,14 @@ const userSchema = new mongoose.Schema({
     required: [true, 'Email is required'],
     unique: true,
     lowercase: true,
+    trim: true,
     match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
   },
   phoneNumber: {
     type: String,
     required: [true, 'Phone number is required'],
     unique: true,
+    trim: true,
     match: [/^[\+]?[1-9][\d]{0,15}$/, 'Please enter a valid phone number']
   },
   password: {
@@ -34,27 +36,31 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
+
+  // Contacts now stored as array of ObjectId
   contacts: [{
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    },
-    addedAt: {
-      type: Date,
-      default: Date.now
-    }
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+
+  // Contact request tracking
+  requestsSent: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+  requestsReceived: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   }]
+
 }, {
   timestamps: true
 });
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {
-  // Only hash the password if it has been modified (or is new)
   if (!this.isModified('password')) return next();
-  
   try {
-    // Hash password with cost of 12
     const hashedPassword = await bcrypt.hash(this.password, 12);
     this.password = hashedPassword;
     next();
@@ -63,12 +69,10 @@ userSchema.pre('save', async function(next) {
   }
 });
 
-// Instance method to check password
 userSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// Transform output to exclude password
 userSchema.methods.toJSON = function() {
   const userObject = this.toObject();
   delete userObject.password;
