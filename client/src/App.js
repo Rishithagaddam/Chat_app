@@ -43,6 +43,17 @@ function App() {
           dispatch(fetchContacts());
           dispatch(fetchRequests());
         });
+        
+        // Handle real-time online/offline status updates
+        s.on('userOnline', (data) => {
+          // Refresh contacts to update online status
+          dispatch(fetchContacts());
+        });
+        
+        s.on('userOffline', (data) => {
+          // Refresh contacts to update offline status  
+          dispatch(fetchContacts());
+        });
       }
     } else {
       disconnectSocket();
@@ -52,6 +63,8 @@ function App() {
       if (s) {
         s.off('contactRequest');
         s.off('contactAccepted');
+        s.off('userOnline');
+        s.off('userOffline');
       }
       disconnectSocket();
     };

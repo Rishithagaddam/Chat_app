@@ -120,10 +120,24 @@ export default function GroupCreate({ currentUser }) {
                     style={{ marginRight: '12px', cursor: 'pointer' }}
                   />
                   <div>
-                    <strong>{u.name}</strong>
-                    {u.isOnline && <span style={{ color: '#00b894', fontSize: '12px', marginLeft: '8px' }}>● Online</span>}
-                    <br/>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <strong>{u.name}</strong>
+                      {u.isOnline ? (
+                        <span style={{ color: '#00b894', fontSize: '12px', fontWeight: '500' }}>
+                          ● Online
+                        </span>
+                      ) : (
+                        <span style={{ color: '#636e72', fontSize: '12px', fontWeight: '500' }}>
+                          ● Offline
+                        </span>
+                      )}
+                    </div>
                     <small className="text-light">{u.email}</small>
+                    {!u.isOnline && u.lastSeen && (
+                      <small style={{ color: 'var(--text-light)', display: 'block' }}>
+                        Last seen: {new Date(u.lastSeen).toLocaleDateString()}
+                      </small>
+                    )}
                   </div>
                 </div>
               ))}
