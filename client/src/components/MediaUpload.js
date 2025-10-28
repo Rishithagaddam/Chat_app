@@ -1,5 +1,7 @@
 import React, { useRef, useState } from 'react';
 import api from '../api';
+import notificationService from '../services/notificationService';
+import activityService from '../services/activityService';
 
 const MediaUpload = ({ onSend, disabled, receiverId, groupId }) => {
   const [uploading, setUploading] = useState(false);
@@ -44,6 +46,27 @@ const MediaUpload = ({ onSend, disabled, receiverId, groupId }) => {
       if (response.data.success) {
         // Send the uploaded message data to parent
         onSend(response.data.data.message);
+        
+        // Log activity for media sharing
+        const currentUser = JSON.parse(localStorage.getItem('user'));
+        if (currentUser) {
+          activityService.mediaShared(
+            currentUser._id,
+            currentUser.name,
+            groupId || receiverId,
+            type,
+            file.name
+          );
+
+          // Show success notification
+          notificationService.showNotification(
+            'Media Shared',
+            {
+              body: `${file.name} uploaded successfully`,
+              icon: '/favicon.ico'
+            }
+          );
+        }
         
         // Update the media files list if we're in a group
         if (groupId) {

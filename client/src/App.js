@@ -14,6 +14,9 @@ import GroupCreate from './pages/GroupCreate';
 import ContactsList from './pages/ContactsList';
 import ContactRequests from './pages/ContactRequests';
 import GroupChat from './pages/GroupChat';
+import NotificationToast from './components/NotificationToast';
+import notificationService from './services/notificationService';
+import activityService from './services/activityService';
 import './App.css';
 
 function App() {
@@ -79,6 +82,12 @@ function App() {
     };
   }, [token, user, dispatch]);
 
+  useEffect(() => {
+    // Initialize notification services
+    notificationService.init();
+    activityService.init();
+  }, []);
+
   const handleLogin = ({ token, user }) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
@@ -99,22 +108,27 @@ function App() {
   };
 
   return (
-    <Router>
-      <Routes>
-        <Route path="/login" element={!user ? <Login onLogin={handleLogin}/> : <Navigate to="/" />} />
-        <Route path="/register" element={!user ? <Register onRegister={handleLogin}/> : <Navigate to="/" />} />
-        <Route path="/" element={user ? <Dashboard user={user} onLogout={handleLogout}/> : <Navigate to="/login" />} >
-          <Route index element={<Users />} />
-          <Route path="users" element={<Users />} />
-          <Route path="chat/:id" element={<Chat currentUser={user} />} />
-          <Route path="groups" element={<Groups currentUser={user} />} />
-          <Route path="groups/new" element={<GroupCreate currentUser={user} />} />
-          <Route path="groups/:id" element={<GroupChat currentUser={user} />} />
-          <Route path="contacts" element={<ContactsList currentUser={user} />} />
-          <Route path="requests" element={<ContactRequests currentUser={user} />} />
-        </Route>
-      </Routes>
-    </Router>
+    <div className="App">
+      <Router>
+        <Routes>
+          <Route path="/login" element={!user ? <Login onLogin={handleLogin}/> : <Navigate to="/" />} />
+          <Route path="/register" element={!user ? <Register onRegister={handleLogin}/> : <Navigate to="/" />} />
+          <Route path="/" element={user ? <Dashboard user={user} onLogout={handleLogout}/> : <Navigate to="/login" />} >
+            <Route index element={<Users />} />
+            <Route path="users" element={<Users />} />
+            <Route path="chat/:id" element={<Chat currentUser={user} />} />
+            <Route path="groups" element={<Groups currentUser={user} />} />
+            <Route path="groups/new" element={<GroupCreate currentUser={user} />} />
+            <Route path="groups/:id" element={<GroupChat currentUser={user} />} />
+            <Route path="contacts" element={<ContactsList currentUser={user} />} />
+            <Route path="requests" element={<ContactRequests currentUser={user} />} />
+          </Route>
+        </Routes>
+      </Router>
+      
+      {/* Keep toast notifications at app level */}
+      <NotificationToast />
+    </div>
   );
 }
 
