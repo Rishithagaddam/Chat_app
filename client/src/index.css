@@ -228,7 +228,7 @@ body {
   gap: 4px;
   transition: none;
   margin-bottom: 12px;
-  max-width: 85%; /* Decreased from previous values */
+  max-width: 70%; /* Decreased from 85% for better readability */
 }
 
 .msg.me {
@@ -253,6 +253,9 @@ body {
   border: 1px solid var(--border-color);
   word-wrap: break-word;
   overflow-wrap: break-word;
+  /* Improved text wrapping for better readability */
+  line-height: 1.4;
+  font-size: 14px;
 }
 
 .msg.me .msg-text-wrapper {
@@ -294,8 +297,11 @@ body {
 /* Message text styling */
 .msg-text {
   font-size: 14px;
-  line-height: 1.4;
+  line-height: 1.5; /* Improved line height for better readability */
   margin-bottom: 4px;
+  max-width: 100%;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .msg-meta {
@@ -314,14 +320,19 @@ body {
   color: var(--text-light);
 }
 
-/* Responsive message width */
+/* Responsive message width - even more compact on mobile */
 @media (max-width: 768px) {
   .msg {
-    max-width: 90%;
+    max-width: 80%; /* Decreased from 90% */
   }
   
   .msg-text-wrapper {
     padding: 10px 14px;
+  }
+  
+  .msg-text {
+    font-size: 13px;
+    line-height: 1.4;
   }
   
   .controls-trigger {
@@ -333,7 +344,7 @@ body {
 
 @media (max-width: 480px) {
   .msg {
-    max-width: 95%;
+    max-width: 85%; /* Decreased from 95% */
   }
   
   .msg-text-wrapper {
@@ -345,20 +356,20 @@ body {
   }
 }
 
-/* Media message styling */
+/* Media message styling - also decreased */
 .msg .media-message {
-  max-width: 280px;
+  max-width: 250px; /* Decreased from 280px */
 }
 
 @media (max-width: 768px) {
   .msg .media-message {
-    max-width: 240px;
+    max-width: 220px; /* Decreased from 240px */
   }
 }
 
 @media (max-width: 480px) {
   .msg .media-message {
-    max-width: 200px;
+    max-width: 180px; /* Decreased from 200px */
   }
 }
 

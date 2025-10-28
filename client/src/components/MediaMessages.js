@@ -633,7 +633,7 @@ const MediaMessages = ({ message, isSent, senderName }) => {
   switch (messageType) {
     case 'image':
       return (
-        <div className="media-message" style={{ maxWidth: '280px', borderRadius: '12px', overflow: 'hidden' }}>
+        <div className="media-message" style={{ maxWidth: '250px', borderRadius: '12px', overflow: 'hidden' }}>
           <img 
             src={fileUrl.startsWith('blob:') ? fileUrl : `${baseUrl}${fileUrl}`}
             alt={fileName || 'Image'}
@@ -673,7 +673,7 @@ const MediaMessages = ({ message, isSent, senderName }) => {
 
     case 'video':
       return (
-        <div className="media-message" style={{ maxWidth: '280px', borderRadius: '12px', overflow: 'hidden' }}>
+        <div className="media-message" style={{ maxWidth: '250px', borderRadius: '12px', overflow: 'hidden' }}>
           <video 
             controls 
             style={{ width: '100%', height: 'auto', borderRadius: '8px' }}
