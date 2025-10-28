@@ -157,12 +157,15 @@ const MessageControls = ({
               borderRadius: '50%',
               background: 'var(--primary-medium)',
               color: 'white',
-              display: showControls ? 'flex' : 'none',
+              display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
               fontSize: '10px',
-              zIndex: 10
+              zIndex: 10,
+              opacity: showControls ? 1 : 0.8,
+              transform: showControls ? 'scale(1.1)' : 'scale(1)',
+              transition: 'all 0.2s ease'
             }}
           >
             ⚙️

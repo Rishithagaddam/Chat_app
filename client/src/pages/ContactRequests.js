@@ -87,10 +87,32 @@ export default function ContactRequests() {
                   Requested: {new Date(req.createdAt).toLocaleString()}
                 </p>
                 <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
-                  <button onClick={() => handleAccept(req._id)} style={{ background: 'var(--success-color)' }}>
+                  <button 
+                    onClick={() => handleAccept(req._id)} 
+                    style={{ 
+                      background: '#00b894', 
+                      color: 'white',
+                      border: 'none',
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontWeight: '600'
+                    }}
+                  >
                     ✅ Accept
                   </button>
-                  <button onClick={() => handleReject(req._id)} style={{ background: 'var(--error-color)' }}>
+                  <button 
+                    onClick={() => handleReject(req._id)} 
+                    style={{ 
+                      background: '#ff6b6b',
+                      color: 'white',
+                      border: 'none',
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontWeight: '600'
+                    }}
+                  >
                     ❌ Reject
                   </button>
                 </div>
@@ -134,7 +156,18 @@ export default function ContactRequests() {
                   Status: <span style={{ color: '#ffa502' }}>⏳ Pending</span>
                 </p>
                 <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
-                  <button onClick={() => handleWithdraw(req._id)} style={{ background: 'var(--error-color)', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}>
+                  <button 
+                    onClick={() => handleWithdraw(req._id)} 
+                    style={{ 
+                      background: '#ff6b6b', 
+                      color: 'white', 
+                      border: 'none', 
+                      padding: '8px 16px', 
+                      borderRadius: '8px', 
+                      cursor: 'pointer', 
+                      fontWeight: '600' 
+                    }}
+                  >
                     🗑️ Withdraw Request
                   </button>
                 </div>

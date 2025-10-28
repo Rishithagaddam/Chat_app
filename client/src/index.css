@@ -3,11 +3,14 @@
   --primary-medium: #8b4a4a;
   --primary-light: #c97676;
   --accent-light: #f5e6d3;
+  --accent-medium: #e6d0c4;
   --white: #ffffff;
   --text-dark: #2c1810;
   --text-light: #6b4e3d;
   --border-color: #e6d0c4;
   --shadow: rgba(74, 30, 44, 0.15);
+  --success-color: #00b894;
+  --error-color: #ff6b6b;
   --gradient-primary: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-medium) 50%, var(--primary-light) 100%);
   --gradient-light: linear-gradient(135deg, var(--accent-light) 0%, var(--white) 100%);
 }
@@ -536,6 +539,42 @@ h2 {
 
 .user-item p, .group-item p, .contact-item p {
   margin: 0;
+  color: var(--text-light);
+  font-size: 14px;
+}
+
+/* Request List Styles */
+.request-list {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+.request-item {
+  background: var(--white);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 20px var(--shadow);
+  border: 1px solid var(--border-color);
+  transition: all 0.3s ease;
+}
+
+.request-item:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 32px var(--shadow);
+  border-color: var(--primary-light);
+}
+
+.request-item h3 {
+  margin: 0 0 10px 0;
+  color: var(--primary-dark);
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+}
+
+.request-item p {
+  margin: 8px 0;
   color: var(--text-light);
   font-size: 14px;
 }

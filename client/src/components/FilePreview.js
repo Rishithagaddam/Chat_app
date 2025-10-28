@@ -103,6 +103,15 @@ const FilePreview = ({ fileName, fileUrl, mimeType, fileSize, onClose }) => {
     return null;
   };
 
+  const handleDownload = () => {
+    const link = document.createElement('a');
+    link.href = fileUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div style={{
       position: 'fixed',
@@ -158,26 +167,21 @@ const FilePreview = ({ fileName, fileUrl, mimeType, fileSize, onClose }) => {
           </div>
           
           <div style={{ display: 'flex', gap: '8px' }}>
-            <a
-              href={fileUrl}
-              download={fileName}
+            <button
+              onClick={handleDownload}
               style={{
                 background: 'var(--primary-medium)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
                 padding: '8px 16px',
-                textDecoration: 'none',
                 cursor: 'pointer',
                 fontSize: '14px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
+                fontWeight: '600'
               }}
             >
-              📥 Download
-            </a>
-            
+              ⬇️ Download
+            </button>
             <button
               onClick={onClose}
               style={{

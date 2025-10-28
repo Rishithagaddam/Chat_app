@@ -16,60 +16,74 @@ const MediaUpload = ({ onSend, disabled, receiverId, groupId }) => {
     setUploadType(type);
 
     try {
-      // For now, create a mock message since we don't have the actual upload endpoint
-      const mockMessage = {
-        _id: `media-${Date.now()}`,
-        messageType: type,
-        fileName: file.name,
-        fileSize: file.size,
-        mimeType: file.type,
-        fileUrl: URL.createObjectURL(file), // Temporary URL for preview
-        message: '', // No caption for now
-        sender: {
-          _id: 'current_user',
-          name: 'Current User'
-        },
-        createdAt: new Date().toISOString()
-      };
-
-      // Add duration for audio/video files if available
-      if (type === 'audio' || type === 'video') {
-        const mediaElement = document.createElement(type);
-        mediaElement.src = mockMessage.fileUrl;
-        mediaElement.onloadedmetadata = () => {
-          mockMessage.duration = mediaElement.duration;
-        };
-      }
-
-      // Add dimensions for images
-      if (type === 'image') {
-        const img = new Image();
-        img.onload = () => {
-          mockMessage.dimensions = {
-            width: img.width,
-            height: img.height
-          };
-        };
-        img.src = mockMessage.fileUrl;
-      }
-
-      onSend(mockMessage);
+      const formData = new FormData();
+      formData.append('file', file);
       
-      // Update the media files list if we're in a group
+      if (receiverId) {
+        formData.append('receiverId', receiverId);
+      }
       if (groupId) {
-        // Trigger a refresh of media files
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('refreshGroupMedia', { detail: { groupId } }));
-        }, 100);
+        formData.append('groupId', groupId);
+      }
+
+      // Get duration for audio/video files
+      if (type === 'audio' || type === 'video' || type === 'voice') {
+        const duration = await getMediaDuration(file, type);
+        if (duration) {
+          formData.append('duration', duration.toString());
+        }
+      }
+
+      // Upload to server
+      const response = await api.post(`/media/upload/${type}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (response.data.success) {
+        // Send the uploaded message data to parent
+        onSend(response.data.data.message);
+        
+        // Update the media files list if we're in a group
+        if (groupId) {
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('refreshGroupMedia', { detail: { groupId } }));
+          }, 100);
+        }
       }
 
     } catch (error) {
       console.error('Upload failed:', error);
-      alert('Failed to process file. Please try again.');
+      alert('Failed to upload file. Please try again.');
     } finally {
       setUploading(false);
       setUploadType(null);
     }
+  };
+
+  const getMediaDuration = (file, type) => {
+    return new Promise((resolve) => {
+      if (type === 'audio' || type === 'voice') {
+        const audio = document.createElement('audio');
+        audio.src = URL.createObjectURL(file);
+        audio.onloadedmetadata = () => {
+          resolve(audio.duration);
+          URL.revokeObjectURL(audio.src);
+        };
+        audio.onerror = () => resolve(null);
+      } else if (type === 'video') {
+        const video = document.createElement('video');
+        video.src = URL.createObjectURL(file);
+        video.onloadedmetadata = () => {
+          resolve(video.duration);
+          URL.revokeObjectURL(video.src);
+        };
+        video.onerror = () => resolve(null);
+      } else {
+        resolve(null);
+      }
+    });
   };
 
   const handleImageUpload = (e) => {
