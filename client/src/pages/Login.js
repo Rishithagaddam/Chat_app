@@ -15,6 +15,7 @@ export default function Login({ onLogin }) {
   const [password, setPassword] = useState('');
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const submitIdentify = async (e) => {
     e?.preventDefault();
@@ -77,7 +78,23 @@ export default function Login({ onLogin }) {
       ) : (
         <form onSubmit={submitPassword}>
           <input placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} />
-          <input placeholder="Password" type="password" value={password} onChange={e=>setPassword(e.target.value)} />
+          <div className="password-input-container">
+            <input 
+              placeholder="Password" 
+              type={showPassword ? "text" : "password"} 
+              value={password} 
+              onChange={e=>setPassword(e.target.value)}
+              style={{ paddingRight: '50px' }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="password-toggle-btn"
+              title={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? '🙈' : '👁️'}
+            </button>
+          </div>
           <div style={{ marginTop: 8 }}>
             <button type="submit" disabled={loading}>{loading ? 'Logging in...' : 'Login'}</button>
             {' '}

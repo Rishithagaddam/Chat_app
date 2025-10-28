@@ -6,6 +6,7 @@ export default function Register({ onRegister }) {
   const [form, setForm] = useState({ name:'', email:'', phoneNumber:'', password:'' });
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const submitRegister = async (e) => {
     e.preventDefault();
@@ -85,7 +86,23 @@ export default function Register({ onRegister }) {
           <input placeholder="👤 Full Name" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
           <input placeholder="📧 Email Address" type="email" value={form.email} onChange={e=>setForm({...form, email:e.target.value})} />
           <input placeholder="📱 Phone Number" value={form.phoneNumber} onChange={e=>setForm({...form, phoneNumber:e.target.value})} />
-          <input placeholder="🔒 Password" type="password" value={form.password} onChange={e=>setForm({...form, password:e.target.value})} />
+          <div className="password-input-container">
+            <input 
+              placeholder="🔒 Password" 
+              type={showPassword ? "text" : "password"} 
+              value={form.password} 
+              onChange={e=>setForm({...form, password:e.target.value})}
+              style={{ paddingRight: '50px' }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="password-toggle-btn"
+              title={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? '🙈' : '👁️'}
+            </button>
+          </div>
           <div style={{ marginTop: '20px' }}>
             <button type="submit" disabled={loading}>
               {loading ? '✨ Creating Account...' : '🚀 Create Account'}
@@ -100,7 +117,23 @@ export default function Register({ onRegister }) {
       ) : (
         <form onSubmit={submitLogin}>
           <input placeholder="📧 Email Address" type="email" value={form.email} onChange={e=>setForm({...form, email:e.target.value})} />
-          <input placeholder="🔒 Password" type="password" value={form.password} onChange={e=>setForm({...form, password:e.target.value})} />
+          <div className="password-input-container">
+            <input 
+              placeholder="🔒 Password" 
+              type={showPassword ? "text" : "password"} 
+              value={form.password} 
+              onChange={e=>setForm({...form, password:e.target.value})}
+              style={{ paddingRight: '50px' }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="password-toggle-btn"
+              title={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? '🙈' : '👁️'}
+            </button>
+          </div>
           <div style={{ marginTop: '20px' }}>
             <button type="submit" disabled={loading}>
               {loading ? '🔓 Signing In...' : '🎯 Sign In'}
