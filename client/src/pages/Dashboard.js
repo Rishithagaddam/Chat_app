@@ -96,25 +96,29 @@ export default function Dashboard({ user, onLogout }) {
                 alignItems: 'center',
                 gap: '8px',
                 cursor: 'pointer',
-                transition: 'all 0.3s ease'
+                
+                transition: 'all 0.3s ease',
+                height: '32px', // Fixed height to match other buttons
+                minWidth: 'fit-content'
               }}
               onMouseOver={(e) => {
-                e.target.style.background = 'rgba(255, 255, 255, 0.2)';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
               }}
               onMouseOut={(e) => {
-                e.target.style.background = 'rgba(255, 255, 255, 0.1)';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
               }}
             >
               {/* Profile Picture */}
               <div style={{
-                width: '32px',
-                height: '32px',
+                width: '40px',
+                height: '40px',
                 borderRadius: '50%',
                 overflow: 'hidden',
                 background: 'rgba(255, 255, 255, 0.3)',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center'
+                justifyContent: 'center',
+                flexShrink: 0
               }}>
                 {userProfile.profilePicture ? (
                   <img
@@ -123,7 +127,7 @@ export default function Dashboard({ user, onLogout }) {
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
                 ) : (
-                  <span style={{ fontSize: '14px', color: 'white' }}>👤</span>
+                  <span style={{ fontSize: '16px', color: 'white' }}>👤</span>
                 )}
               </div>
               
@@ -132,34 +136,41 @@ export default function Dashboard({ user, onLogout }) {
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'flex-start',
-                minWidth: '0'
+                justifyContent: 'center',
+                minWidth: '0',
+                lineHeight: 1
               }}>
                 {/* <span style={{ 
                   color: 'white', 
-                  fontSize: '12px', 
+                  fontSize: '11px', 
                   fontWeight: '600',
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
-                  maxWidth: '120px'
+                  maxWidth: '100px'
                 }}>
                   {userProfile.name}
                 </span> */}
                 {userProfile.statusMessage && (
                   <span style={{ 
                     color: 'rgba(255, 255, 255, 0.7)', 
-                    fontSize: '10px',
+                    fontSize: '9px',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
-                    maxWidth: '120px'
+                    maxWidth: '100px',
+                    marginTop: '1px'
                   }}>
                     {userProfile.statusMessage}
                   </span>
                 )}
               </div>
               
-              {/* <span style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '10px' }}>✏️</span> */}
+              {/* <span style={{ 
+                color: 'rgba(255, 255, 255, 0.7)', 
+                fontSize: '8px',
+                marginLeft: '4px'
+              }}>✏️</span> */}
             </div>
           </div>
 
@@ -179,7 +190,10 @@ export default function Dashboard({ user, onLogout }) {
                 padding: '4px 8px',
                 borderRadius: '12px',
                 fontSize: '11px',
-                fontWeight: '600'
+                fontWeight: '600',
+                height: '24px',
+                display: 'flex',
+                alignItems: 'center'
               }}>
                 🔕 DND
               </div>
@@ -201,7 +215,8 @@ export default function Dashboard({ user, onLogout }) {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
-                backdropFilter: 'blur(10px)'
+                backdropFilter: 'blur(10px)',
+                height: '32px' // Fixed height
               }}
             >
               📋 Activity
@@ -239,31 +254,14 @@ export default function Dashboard({ user, onLogout }) {
                 cursor: 'pointer',
                 fontSize: '12px',
                 fontWeight: '600',
-                backdropFilter: 'blur(10px)'
+                backdropFilter: 'blur(10px)',
+                height: '32px', // Fixed height
+                display: 'flex',
+                alignItems: 'center'
               }}
             >
               🔔
             </button>
-
-            {/* Quick DND Toggle
-            <button
-              onClick={toggleDND}
-              title={isDndActive ? 'Turn off Do Not Disturb' : 'Turn on Do Not Disturb'}
-              style={{
-                background: isDndActive 
-                  ? 'rgba(255, 107, 107, 0.8)' 
-                  : 'rgba(0, 184, 148, 0.8)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                padding: '6px 10px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                backdropFilter: 'blur(10px)'
-              }}
-            >
-              {isDndActive ? '🔕' : '🔔'}
-            </button> */}
 
             {/* Notification Permission Warning */}
             {notificationService.permission !== 'granted' && (
@@ -276,7 +274,10 @@ export default function Dashboard({ user, onLogout }) {
                   borderRadius: '6px',
                   fontSize: '11px',
                   fontWeight: '600',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  height: '24px',
+                  display: 'flex',
+                  alignItems: 'center'
                 }}
                 title="Click to enable notifications"
               >
@@ -299,7 +300,8 @@ export default function Dashboard({ user, onLogout }) {
             display: 'flex',
             alignItems: 'center',
             gap: '4px',
-            backdropFilter: 'blur(10px)' 
+            backdropFilter: 'blur(10px)',
+            height: '32px' // Fixed height to match other buttons
           }}>
             <span style={{ fontSize: '14px', fontWeight: 'bold' }}>⬅️</span> 
             Logout
