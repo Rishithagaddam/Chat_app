@@ -51,7 +51,23 @@ const userSchema = new mongoose.Schema({
   requestsReceived: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
-  }]
+  }],
+
+  // New profile fields
+  profilePicture: {
+    type: String,
+    default: null // URL to profile image
+  },
+  bio: {
+    type: String,
+    default: '',
+    maxlength: [150, 'Bio cannot be more than 150 characters']
+  },
+  statusMessage: {
+    type: String,
+    default: '',
+    maxlength: [100, 'Status message cannot be more than 100 characters']
+  }
 
 }, {
   timestamps: true

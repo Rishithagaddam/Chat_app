@@ -2,14 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, Link } from 'react-router-dom';
 import NotificationSettings from '../components/NotificationSettings';
 import ActivityCenter from '../components/ActivityCenter';
+import ProfileModal from '../components/ProfileModal';
 import notificationService from '../services/notificationService';
 import activityService from '../services/activityService';
 
 export default function Dashboard({ user, onLogout }) {
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
   const [showActivityCenter, setShowActivityCenter] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isDndActive, setIsDndActive] = useState(false);
+  const [userProfile, setUserProfile] = useState(user);
 
   useEffect(() => {
     // Initialize notification counts and status
@@ -49,6 +52,12 @@ export default function Dashboard({ user, onLogout }) {
     setIsDndActive(!isDndActive);
   };
 
+  const handleProfileUpdate = (updatedProfile) => {
+    setUserProfile(updatedProfile);
+    // Update the user state in App.js if needed
+    // You might want to lift this state up or use a context
+  };
+
   return (
     <div className="app-shell">
       <header>
@@ -59,7 +68,7 @@ export default function Dashboard({ user, onLogout }) {
             margin: 0, 
             fontSize: '14px' 
           }}>
-            Welcome back, {user.name}!
+            Welcome back, {userProfile.name}!
           </p>
         </div>
         
@@ -70,13 +79,96 @@ export default function Dashboard({ user, onLogout }) {
           <Link to="/groups">🎯 Groups</Link>
           <Link to="/requests">📬 Requests</Link>
           
-          {/* Notification Controls */}
+          {/* Profile Section */}
           <div style={{ 
             display: 'flex', 
             alignItems: 'center', 
             gap: '8px',
             marginLeft: '20px',
             paddingLeft: '20px',
+            borderLeft: '1px solid rgba(255, 255, 255, 0.3)'
+          }}>
+            {/* Profile Picture & Info */}
+            <div
+              onClick={() => setShowProfileModal(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.target.style.background = 'rgba(255, 255, 255, 0.2)';
+              }}
+              onMouseOut={(e) => {
+                e.target.style.background = 'rgba(255, 255, 255, 0.1)';
+              }}
+            >
+              {/* Profile Picture */}
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                overflow: 'hidden',
+                background: 'rgba(255, 255, 255, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                {userProfile.profilePicture ? (
+                  <img
+                    src={`http://localhost:5000${userProfile.profilePicture}`}
+                    alt="Profile"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <span style={{ fontSize: '14px', color: 'white' }}>👤</span>
+                )}
+              </div>
+              
+              {/* User Info */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-start',
+                minWidth: '0'
+              }}>
+                {/* <span style={{ 
+                  color: 'white', 
+                  fontSize: '12px', 
+                  fontWeight: '600',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  maxWidth: '120px'
+                }}>
+                  {userProfile.name}
+                </span> */}
+                {userProfile.statusMessage && (
+                  <span style={{ 
+                    color: 'rgba(255, 255, 255, 0.7)', 
+                    fontSize: '10px',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    maxWidth: '120px'
+                  }}>
+                    {userProfile.statusMessage}
+                  </span>
+                )}
+              </div>
+              
+              {/* <span style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '10px' }}>✏️</span> */}
+            </div>
+          </div>
+
+          {/* Notification Controls */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '8px',
+            paddingLeft: '12px',
             borderLeft: '1px solid rgba(255, 255, 255, 0.3)'
           }}>
             {/* DND Indicator */}
@@ -194,7 +286,8 @@ export default function Dashboard({ user, onLogout }) {
           </div>
 
           {/* Logout Button */}
-          <button onClick={onLogout} style={{ marginLeft: '12px', 
+          <button onClick={onLogout} style={{ 
+            marginLeft: '12px', 
             background: 'rgba(255, 255, 255, 0.15)',
             color: 'white',
             border: '1px solid rgba(255, 255, 255, 0.3)',
@@ -206,7 +299,8 @@ export default function Dashboard({ user, onLogout }) {
             display: 'flex',
             alignItems: 'center',
             gap: '4px',
-            backdropFilter: 'blur(10px)' }}>
+            backdropFilter: 'blur(10px)' 
+          }}>
             <span style={{ fontSize: '14px', fontWeight: 'bold' }}>⬅️</span> 
             Logout
           </button>
@@ -216,6 +310,14 @@ export default function Dashboard({ user, onLogout }) {
       <main>
         <Outlet />
       </main>
+
+      {/* Profile Modal */}
+      <ProfileModal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        user={userProfile}
+        onProfileUpdate={handleProfileUpdate}
+      />
 
       {/* Notification Modals */}
       <NotificationSettings 

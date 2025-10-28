@@ -60,6 +60,24 @@ function App() {
           dispatch(fetchContacts());
         });
 
+        // Handle real-time profile updates
+        s.on('profileUpdate', (profileData) => {
+          console.log('👤 Profile updated:', profileData);
+          // Update user data if it's the current user
+          if (profileData.userId === (user?.id || user?._id)) {
+            const updatedUser = {
+              ...user,
+              name: profileData.name,
+              profilePicture: profileData.profilePicture
+            };
+            setUser(updatedUser);
+            localStorage.setItem('user', JSON.stringify(updatedUser));
+          }
+          
+          // Refresh contacts and users to show updated profiles
+          dispatch(fetchContacts());
+        });
+
         // Handle list of online users on connect
         s.on('onlineUsers', (users) => {
           console.log('📋 Received online users list:', users.length);
@@ -77,6 +95,7 @@ function App() {
         s.off('userOnline');
         s.off('userOffline');
         s.off('onlineUsers');
+        s.off('profileUpdate');
       }
       disconnectSocket();
     };

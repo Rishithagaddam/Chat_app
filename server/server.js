@@ -18,6 +18,7 @@ const groupRoutes = require('./routes/groups');
 const pollRoutes = require('./routes/polls');
 const announcementRoutes = require('./routes/announcements');
 const mediaRoutes = require('./routes/media');
+const profileRoutes = require('./routes/profile');
 
 // Load environment variables
 dotenv.config();
@@ -124,6 +125,7 @@ app.use('/api/groups', groupRoutes);
 app.use('/api/polls', pollRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/media', mediaRoutes);
+app.use('/api/profile', profileRoutes);
 console.log('✅ API routes registered');
 
 // Handle Socket.IO connections
