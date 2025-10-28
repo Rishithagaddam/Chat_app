@@ -14,26 +14,24 @@ export default function Chat({ currentUser }) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [quotedMessage, setQuotedMessage] = useState(null);
-  const [forwardingMessage, setForwardingMessage] = useState(null);
   const socket = getSocket();
   const endRef = useRef(null);
   
   const { contacts } = useSelector(state => state.contacts);
 
+  // Keep only one set of useEffect hooks at the top
   useEffect(() => {
     (async () => {
       try {
         const res = await api.get(`/messages/${otherId}`);
         setMessages(res.data.messages || []);
         setOther(res.data.chatWith || null);
-        // join the room for this conversation (enables multi-tab sync)
         if (socket) {
           const roomId = [String(currentUser?.id || currentUser?._id), String(otherId)].sort().join('_');
           socket.emit('joinRoom', roomId);
         }
       } catch (e) { /* ignore */ }
     })();
-    // leave on unmount handled in cleanup below
   }, [otherId, socket, currentUser]);
 
   useEffect(() => {
@@ -94,15 +92,21 @@ export default function Chat({ currentUser }) {
         });
 
         // Avoid adding duplicate if same _id already present
-        if (msg._id && filtered.some(m => String(m._id) === String(msg._id))) return filtered;
+        if (msg._id && filtered.some(m => String(m._id) === String(msg._id))) {
+          return filtered.map(m => 
+            String(m._id) === String(msg._id) 
+              ? { ...m, deliveredAt: new Date() }
+              : m
+          );
+        }
 
-        return [...filtered, msg];
+        return [...filtered, { ...msg, deliveredAt: new Date() }];
       });
     };
 
     // Listen for message updates
     const handleMessageEdited = (data) => {
-      setMessages(prev => prev.map(m => 
+      setMessages((prev) => prev.map((m) => 
         m._id === data.messageId 
           ? { ...m, message: data.newContent, isEdited: true }
           : m
@@ -110,13 +114,14 @@ export default function Chat({ currentUser }) {
     };
 
     const handleMessageDeleted = (data) => {
-      setMessages(prev => prev.map(m => 
+      setMessages((prev) => prev.map((m) => 
         m._id === data.messageId 
           ? { ...m, isDeleted: true, message: 'This message was deleted' }
           : m
       ));
     };
 
+    // Fix the message reaction handler
     const handleMessageReaction = (data) => {
       setMessages(prev => prev.map(m => 
         m._id === data.messageId 
@@ -125,6 +130,7 @@ export default function Chat({ currentUser }) {
       ));
     };
 
+    // Fix the message pinned handler
     const handleMessagePinned = (data) => {
       setMessages(prev => prev.map(m => 
         m._id === data.messageId 
@@ -133,12 +139,42 @@ export default function Chat({ currentUser }) {
       ));
     };
 
+    // Fix the message forwarded handler
+    const handleMessageForwarded = (data) => {
+      setMessages(prev => prev.map(m => 
+        m._id === data.messageId 
+          ? { ...m, isForwarded: true }
+          : m
+      ));
+    };
+
+    const handleMessagesRead = (data) => {
+      const { messageIds, readBy, readAt } = data;
+      
+      // Only update if the reader is the other person in this chat
+      if (readBy === otherId) {
+        setMessages(prev => prev.map(m => 
+          messageIds.includes(m._id)
+            ? { 
+                ...m, 
+                readStatus: { 
+                  isRead: true, 
+                  readAt: new Date(readAt) 
+                }
+              }
+            : m
+        ));
+      }
+    };
+
     socket.on('receiveMessage', handleReceiveMessage);
     socket.on('messageDelivered', handleMessageDelivered);
     socket.on('messageEdited', handleMessageEdited);
     socket.on('messageDeleted', handleMessageDeleted);
     socket.on('messageReaction', handleMessageReaction);
     socket.on('messagePinned', handleMessagePinned);
+    socket.on('messageForwarded', handleMessageForwarded);
+    socket.on('messagesRead', handleMessagesRead);
 
     // Remove newMessage handler as it causes duplicates
     // socket.on('newMessage', handleNewMessage);
@@ -150,6 +186,8 @@ export default function Chat({ currentUser }) {
       socket.off('messageDeleted', handleMessageDeleted);
       socket.off('messageReaction', handleMessageReaction);
       socket.off('messagePinned', handleMessagePinned);
+      socket.off('messageForwarded', handleMessageForwarded);
+      socket.off('messagesRead', handleMessagesRead);
       // leave the conversation room
       try {
         const roomId = [String(currentUser?.id || currentUser?._id), String(otherId)].sort().join('_');
@@ -158,15 +196,90 @@ export default function Chat({ currentUser }) {
     };
   }, [socket, otherId, currentUser]);
 
-  useEffect(()=> { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => { 
+    endRef.current?.scrollIntoView({ behavior: 'smooth' }); 
+  }, [messages]);
 
+  // Replace the existing message reading effect
+  useEffect(() => {
+    const markMessagesAsRead = async () => {
+      // Only proceed if:
+      // 1. Messages exist
+      // 2. User is actively viewing the chat
+      // 3. This is the receiver's chat window
+      if (
+        messages.length > 0 && 
+        document.visibilityState === 'visible' &&
+        otherId === String(messages[0]?.sender?._id)  // Check if we're the receiver
+      ) {
+        const unreadMessages = messages.filter(m => 
+          // Only mark messages from the other user that aren't read yet
+          String(m.sender?._id) === otherId && 
+          !m.readStatus?.isRead &&
+          !m.pending &&
+          m.deliveredAt
+        );
+
+        if (unreadMessages.length > 0) {
+          try {
+            const response = await api.post('/messages/mark-read', {
+              messageIds: unreadMessages.map(m => m._id)
+            });
+
+            if (response.data.success) {
+              // Update local state only after successful server update
+              setMessages(prev => prev.map(m => 
+                unreadMessages.find(um => um._id === m._id)
+                  ? { 
+                      ...m, 
+                      readStatus: { 
+                        isRead: true, 
+                        readAt: new Date() 
+                      }
+                    }
+                  : m
+              ));
+
+              // Notify sender through socket
+              socket?.emit('messagesRead', {
+                messageIds: unreadMessages.map(m => m._id),
+                readBy: currentUser._id,
+                readAt: new Date()
+              });
+            }
+          } catch (error) {
+            console.error('Failed to mark messages as read:', error);
+          }
+        }
+      }
+    };
+
+    // Only mark as read when chat becomes visible
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        markMessagesAsRead();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Initial check when component mounts or messages update
+    if (document.visibilityState === 'visible') {
+      markMessagesAsRead();
+    }
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [messages, currentUser._id, socket, otherId]);
+
+  // Keep only one copy of these handler functions
   const send = async (e) => {
     e.preventDefault();
     if (!text.trim() || sending) return;
     
     setSending(true);
     try {
-      // Use socket if available
       if (socket) {
         // create optimistic temp message
         const tempMsg = {
@@ -178,7 +291,7 @@ export default function Chat({ currentUser }) {
           createdAt: new Date().toISOString(),
           pending: true
         };
-        setMessages(prev => [...prev, tempMsg]);
+        setMessages((prev) => [...prev, tempMsg]);
 
         socket.emit('sendMessage', { receiverId: otherId, message: text });
       } else {
@@ -216,7 +329,7 @@ export default function Chat({ currentUser }) {
       };
       
       // Add temp message to UI
-      setMessages(prev => [...prev, tempMsg]);
+      setMessages((prev) => [...prev, tempMsg]);
       
       // Emit to socket (will be replaced by server response)
       socket.emit('sendMessage', {
@@ -232,11 +345,11 @@ export default function Chat({ currentUser }) {
       });
     } else {
       // Fallback: add to local state only if no socket
-      setMessages(prev => [...prev, mediaMessage]);
+      setMessages((prev) => [...prev, mediaMessage]);
     }
   };
 
-  const isContact = contacts?.some(contact => 
+  const isContact = contacts?.some((contact) => 
     (contact._id || contact).toString() === otherId.toString()
   );
 
@@ -244,8 +357,9 @@ export default function Chat({ currentUser }) {
     return <Navigate to="/users" replace />;
   }
   
+  // Message action handlers
   const handleMessageEdit = (messageId, newContent) => {
-    setMessages(prev => prev.map(m => 
+    setMessages((prev) => prev.map((m) => 
       m._id === messageId 
         ? { ...m, message: newContent, isEdited: true }
         : m
@@ -253,7 +367,7 @@ export default function Chat({ currentUser }) {
   };
 
   const handleMessageDelete = (messageId) => {
-    setMessages(prev => prev.map(m => 
+    setMessages((prev) => prev.map((m) => 
       m._id === messageId 
         ? { ...m, isDeleted: true, message: 'This message was deleted' }
         : m
@@ -268,13 +382,23 @@ export default function Chat({ currentUser }) {
     // Real-time update will be handled by socket
   };
 
-  const handleMessageForward = (message) => {
-    setForwardingMessage(message);
-  };
-
   const handleMessageQuote = (message) => {
     setQuotedMessage(message);
   };
+  const handleMessageForward = async (message) => {
+  try {
+    if (socket) {
+      socket.emit('messageForward', {
+        messageId: message._id,
+        originalSenderId: message.sender._id,
+        forwardedBy: currentUser._id,
+        originalMessage: message
+      });
+    }
+  } catch (error) {
+    console.error('Failed to forward message:', error);
+  }
+}; // Add missing closing brace and semicolon
 
   const sendQuotedMessage = async (e) => {
     e.preventDefault();
@@ -313,7 +437,7 @@ export default function Chat({ currentUser }) {
             <p>Send a message to begin chatting</p>
           </div>
         ) : (
-          messages.map(m => {
+          messages.map((m) => {
             const senderId = String(m.sender?._id || m.sender);
             const mine = senderId === String(currentUser.id || currentUser._id);
             
@@ -322,7 +446,6 @@ export default function Chat({ currentUser }) {
                 key={m._id} 
                 className={mine ? 'msg me' : 'msg'} 
                 style={{ 
-                  animationDelay: '0.1s',
                   opacity: m.isDeleted ? 0.5 : 1
                 }}
               >
@@ -386,6 +509,34 @@ export default function Chat({ currentUser }) {
                     />
                   </div>
                 </div>
+
+                {mine && (
+                  <div 
+                    className="read-status"
+                    style={{
+                      fontSize: '11px',
+                      marginTop: '2px',
+                      textAlign: 'right',
+                      color: m.readStatus?.isRead ? 'var(--primary-medium)' : 'var(--text-light)'
+                    }}
+                  >
+                    {m.pending ? (
+                      <span title="Sending...">⏳ Sending</span>
+                    ) : !m.deliveredAt ? (
+                      <span title={`Sent at ${new Date(m.createdAt).toLocaleString()}`}>
+                        ✓ Sent
+                      </span>
+                    ) : !m.readStatus?.isRead ? (
+                      <span title={`Delivered at ${new Date(m.deliveredAt).toLocaleString()}`}>
+                        ✓ Delivered
+                      </span>
+                    ) : (
+                      <span title={`Read at ${new Date(m.readStatus.readAt).toLocaleString()}`}>
+                        ✓✓ Read
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })
@@ -455,6 +606,7 @@ export default function Chat({ currentUser }) {
             onChange={e=>setText(e.target.value)} 
             placeholder={quotedMessage ? "💭 Reply to message..." : "💭 Type a message..."} 
             disabled={sending}
+
             style={{ 
               flex: 1, 
               margin: 0,
@@ -467,6 +619,12 @@ export default function Chat({ currentUser }) {
             disabled={!text.trim() || sending}
             style={{ 
               margin: 0,
+              minWidth: '80px',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
               minWidth: '80px',
               borderRadius: '12px',
               display: 'flex',

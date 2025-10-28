@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import api from '../api';
 
-const MessageControls = ({ 
+export default function MessageControls({ 
   message, 
   currentUser, 
   onEdit, 
@@ -11,7 +11,7 @@ const MessageControls = ({
   onForward, 
   onQuote,
   isGroupChat = false 
-}) => {
+}) {
   const [showControls, setShowControls] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
   const [showForwardModal, setShowForwardModal] = useState(false);
@@ -426,5 +426,3 @@ const MessageControls = ({
     </div>
   );
 };
-
-export default MessageControls;

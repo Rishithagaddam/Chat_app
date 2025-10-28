@@ -46,14 +46,17 @@ export const rejectRequest = createAsyncThunk('contacts/rejectRequest', async (f
   }
 });
 
-export const withdrawRequest = createAsyncThunk('contacts/withdrawRequest', async (toUserId, { rejectWithValue }) => {
-  try {
-    const res = await api.post('/contacts/reject-request', { fromUserId: toUserId });
-    return { toUserId, message: res.data.message };
-  } catch (err) {
-    return rejectWithValue(err.response?.data?.message || err.message);
+export const withdrawRequest = createAsyncThunk(
+  'contacts/withdrawRequest',
+  async (toUserId, { rejectWithValue }) => {
+    try {
+      const res = await api.post('/contacts/withdraw-request', { toUserId });
+      return { toUserId, message: res.data.message };
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
   }
-});
+);
 
 export const fetchContacts = createAsyncThunk('contacts/fetchContacts', async (_, { rejectWithValue }) => {
   try {
@@ -63,6 +66,19 @@ export const fetchContacts = createAsyncThunk('contacts/fetchContacts', async (_
     return rejectWithValue(err.response?.data?.message || err.message);
   }
 });
+
+// Add this thunk action
+export const deleteContact = createAsyncThunk(
+  'contacts/deleteContact',
+  async (contactId, { rejectWithValue }) => {
+    try {
+      await api.delete(`/users/contacts/${contactId}`);
+      return contactId;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
 
 const contactsSlice = createSlice({
   name: 'contacts',
@@ -111,14 +127,39 @@ const contactsSlice = createSlice({
       })
       .addCase(rejectRequest.rejected, (state, action) => { state.error = action.payload; })
 
-      .addCase(withdrawRequest.fulfilled, (state, action) => {
-        const id = action.payload.toUserId;
-        state.requestsSent = state.requestsSent.filter(u => (u._id?.toString() || u.toString()) !== id);
+      .addCase(withdrawRequest.pending, (state) => {
+        state.loading = true;
+        state.error = null;
       })
-      .addCase(withdrawRequest.rejected, (state, action) => { state.error = action.payload; })
+      .addCase(withdrawRequest.fulfilled, (state, action) => {
+        state.loading = false;
+        // Remove the request from requestsSent array
+        state.requestsSent = state.requestsSent.filter(
+          req => req._id !== action.payload.toUserId
+        );
+      })
+      .addCase(withdrawRequest.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
 
       .addCase(fetchContacts.fulfilled, (state, action) => {
         state.contacts = action.payload;
+      })
+
+      .addCase(deleteContact.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(deleteContact.fulfilled, (state, action) => {
+        state.loading = false;
+        state.contacts = state.contacts.filter(c => 
+          (c._id || c).toString() !== action.payload.toString()
+        );
+      })
+      .addCase(deleteContact.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
       });
   }
 });

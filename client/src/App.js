@@ -83,6 +83,13 @@ function App() {
           console.log('📋 Received online users list:', users.length);
           // This can be used to update the UI with current online users
         });
+
+        s.on('requestWithdrawn', ({ fromId, fromName }) => {
+          // Update the UI or show notification
+          console.log(`${fromName} withdrew their contact request`);
+          // Optionally refresh requests
+          dispatch(fetchRequests());
+        });
       }
     } else {
       disconnectSocket();
@@ -96,6 +103,7 @@ function App() {
         s.off('userOffline');
         s.off('onlineUsers');
         s.off('profileUpdate');
+        s.off('requestWithdrawn');
       }
       disconnectSocket();
     };

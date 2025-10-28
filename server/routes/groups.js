@@ -560,4 +560,74 @@ router.delete('/:groupId/members/:memberId', authMiddleware, async (req, res) =>
   }
 });
 
+// Add these new routes
+router.delete('/:groupId', authMiddleware, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const userId = req.user._id;
+
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return res.status(404).json({ success: false, message: 'Group not found' });
+    }
+
+    // Only admin can delete group
+    if (group.admin.toString() !== userId.toString()) {
+      return res.status(403).json({ success: false, message: 'Only admin can delete group' });
+    }
+
+    // Delete all messages in group
+    await Message.deleteMany({ group: groupId });
+    // Delete the group
+    await Group.deleteOne({ _id: groupId });
+
+    // Notify members through socket
+    const io = req.app.get('socketio');
+    if (io) {
+      io.to(groupId).emit('groupDeleted', { groupId, name: group.name });
+    }
+
+    res.json({ success: true, message: 'Group deleted successfully' });
+  } catch (error) {
+    console.error('Delete group error:', error);
+    res.status(500).json({ success: false, message: 'Server error while deleting group' });
+  }
+});
+
+router.put('/:groupId/name', authMiddleware, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { name } = req.body;
+    const userId = req.user._id;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, message: 'Name is required' });
+    }
+
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return res.status(404).json({ success: false, message: 'Group not found' });
+    }
+
+    // Only admin can change name
+    if (group.admin.toString() !== userId.toString()) {
+      return res.status(403).json({ success: false, message: 'Only admin can change group name' });
+    }
+
+    group.name = name.trim();
+    await group.save();
+
+    // Notify members through socket
+    const io = req.app.get('socketio');
+    if (io) {
+      io.to(groupId).emit('groupNameChanged', { groupId, newName: name });
+    }
+
+    res.json({ success: true, message: 'Group name updated', group });
+  } catch (error) {
+    console.error('Update group name error:', error);
+    res.status(500).json({ success: false, message: 'Server error while updating group name' });
+  }
+});
+
 module.exports = router;

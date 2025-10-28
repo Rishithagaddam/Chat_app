@@ -1004,4 +1004,63 @@ router.get('/:chatId/pinned', authMiddleware, async (req, res) => {
   }
 });
 
+// Mark messages as read
+router.post('/mark-read', authMiddleware, async (req, res) => {
+  try {
+    const { messageIds } = req.body;
+    const userId = req.user._id;
+
+    if (!messageIds || !Array.isArray(messageIds)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Message IDs array is required'
+      });
+    }
+
+    // Update all messages
+    const updatedMessages = await Message.updateMany(
+      {
+        _id: { $in: messageIds },
+        receiver: userId,
+        'readStatus.isRead': false
+      },
+      {
+        $set: {
+          'readStatus.isRead': true,
+          'readStatus.readAt': new Date()
+        }
+      }
+    );
+
+    // Get the updated messages for socket event
+    const messages = await Message.find({ _id: { $in: messageIds }})
+      .populate('sender', 'name');
+
+    // Emit socket event to notify senders
+    const io = req.app.get('socketio');
+    if (io) {
+      messages.forEach(msg => {
+        const senderId = msg.sender._id.toString();
+        io.to(`user_${senderId}`).emit('messageRead', {
+          messageId: msg._id,
+          readBy: userId,
+          readAt: new Date()
+        });
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Messages marked as read',
+      count: updatedMessages.modifiedCount
+    });
+  } catch (error) {
+    console.error('Mark messages read error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while marking messages as read'
+    });
+  }
+});
+
 module.exports = router;

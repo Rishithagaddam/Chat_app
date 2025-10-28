@@ -73,18 +73,14 @@ const messageSchema = new mongoose.Schema({
   }, // For images and videos
   
   // Enhanced read tracking for both individual and group messages
-  isRead: {
-    type: mongoose.Schema.Types.Mixed,
-    default: function() {
-      if (this.group) {
-        return []; // Array for group messages
-      } else {
-        return false; // Boolean for individual messages
-      }
+  readStatus: {
+    isRead: {
+      type: Boolean,
+      default: false
+    },
+    readAt: {
+      type: Date
     }
-  },
-  readAt: {
-    type: Date
   },
 
   deliveredTo: [{

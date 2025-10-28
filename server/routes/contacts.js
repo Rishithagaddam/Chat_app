@@ -170,4 +170,65 @@ router.get('/requests', authMiddleware, async (req, res) => {
   }
 });
 
+// Withdraw contact request
+// POST /api/contacts/withdraw-request
+router.post('/withdraw-request', authMiddleware, async (req, res) => {
+  try {
+    const fromId = req.user._id.toString(); // Current user withdrawing their request
+    const { toUserId } = req.body;
+    
+    if (!toUserId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'toUserId is required' 
+      });
+    }
+
+    const sender = await User.findById(fromId);
+    const receiver = await User.findById(toUserId);
+    
+    if (!receiver) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Receiver not found' 
+      });
+    }
+
+    // Remove request from both users
+    sender.requestsSent = (sender.requestsSent || []).filter(
+      id => id.toString() !== toUserId
+    );
+    receiver.requestsReceived = (receiver.requestsReceived || []).filter(
+      id => id.toString() !== fromId
+    );
+
+    await sender.save();
+    await receiver.save();
+
+    // Notify the receiver through socket if online
+    const io = req.app.get('socketio');
+    if (io) {
+      const { activeUsers } = require('../config/socket');
+      const targetReceiver = activeUsers.get(toUserId);
+      if (targetReceiver) {
+        io.to(targetReceiver.socketId).emit('requestWithdrawn', {
+          fromId,
+          fromName: sender.name
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Request withdrawn successfully'
+    });
+  } catch (error) {
+    console.error('Withdraw request error:', error);
+    res.status(500).json({
+      success: false, 
+      message: 'Server error while withdrawing request'
+    });
+  }
+});
+
 module.exports = router;

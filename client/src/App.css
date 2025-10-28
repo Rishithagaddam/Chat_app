@@ -36,6 +36,18 @@
   }
 }
 
+@keyframes badge-pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 .fade-in {
   animation: fadeIn 0.6s ease-out;
 }
@@ -46,6 +58,10 @@
 
 .pulse {
   animation: pulse 2s infinite;
+}
+
+.notification-badge {
+  animation: badge-pulse 2s infinite;
 }
 
 /* Message Controls Styles */
@@ -209,4 +225,10 @@
   .auth h2 {
     font-size: 24px;
   }
+}
+
+:root {
+  /* ... existing variables ... */
+  --danger: #ff6b6b;
+  --danger-light: #ffe5e5;
 }

@@ -1,6 +1,11 @@
 import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchRequests, acceptRequest, rejectRequest } from '../features/contacts/contactsSlice';
+import { 
+  fetchRequests, 
+  acceptRequest, 
+  rejectRequest, 
+  withdrawRequest 
+} from '../features/contacts/contactsSlice';
 import { useNavigate } from 'react-router-dom';
 
 export default function ContactRequests() {
@@ -21,8 +26,16 @@ export default function ContactRequests() {
   };
 
   const handleWithdraw = (id) => {
-    // Use the same reject endpoint for withdrawing sent requests
-    dispatch(rejectRequest(id));
+    dispatch(withdrawRequest(id))
+      .unwrap()
+      .then(() => {
+        // Optionally show success message
+        console.log('Request withdrawn successfully');
+      })
+      .catch(error => {
+        // Handle error
+        console.error('Failed to withdraw request:', error);
+      });
   };
 
   return (
@@ -165,10 +178,14 @@ export default function ContactRequests() {
                       padding: '8px 16px', 
                       borderRadius: '8px', 
                       cursor: 'pointer', 
-                      fontWeight: '600' 
+                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px'
                     }}
                   >
-                    🗑️ Withdraw Request
+                    <span>🗑️</span>
+                    Withdraw Request
                   </button>
                 </div>
               </div>

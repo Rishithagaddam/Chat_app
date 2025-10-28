@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import api from '../api';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getSocket } from '../socket';
 import MessageControls from '../components/MessageControls';
 import GroupTabs from '../components/GroupTabs';
@@ -12,6 +12,7 @@ import MediaMessages from '../components/MediaMessages';
 
 export default function GroupChat({ currentUser }) {
   const { id: groupId } = useParams();
+  const navigate = useNavigate();
   const [group, setGroup] = useState(null);
   const [messages, setMessages] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
@@ -21,6 +22,9 @@ export default function GroupChat({ currentUser }) {
   const [activeTab, setActiveTab] = useState('chat');
   const [showAnnouncementCreator, setShowAnnouncementCreator] = useState(false);
   const [showPollCreator, setShowPollCreator] = useState(false);
+  const [showNameEdit, setShowNameEdit] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [pinnedMessages, setPinnedMessages] = useState([]);
   const socket = getSocket();
   const endRef = useRef(null);
 
@@ -240,6 +244,77 @@ export default function GroupChat({ currentUser }) {
   ) || group?.admin._id === currentUser.id;
 
   const canCreatePolls = group?.settings?.allowPolls !== false;
+
+  const handleDeleteGroup = async () => {
+    if (!window.confirm('Are you sure you want to delete this group? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await api.delete(`/groups/${groupId}`);
+      navigate('/groups');
+    } catch (error) {
+      console.error('Failed to delete group:', error);
+    }
+  };
+
+  const handleNameChange = async () => {
+    if (!newName.trim()) return;
+    
+    try {
+      const res = await api.put(`/groups/${groupId}/name`, { name: newName });
+      setGroup(res.data.group);
+      setShowNameEdit(false);
+      setNewName('');
+    } catch (error) {
+      console.error('Failed to update group name:', error);
+    }
+  };
+
+  const handlePinMessage = async (messageId) => {
+    try {
+      await api.post(`/messages/${messageId}/pin`);
+      // Refresh messages to get updated pin status
+      const res = await api.get(`/groups/${groupId}/messages`);
+      setMessages(res.data.messages || []);
+    } catch (error) {
+      console.error('Failed to pin message:', error);
+    }
+  };
+
+  // Socket events for group and message updates
+  useEffect(() => {
+    if (socket) {
+      socket.on('groupDeleted', ({ groupId: deletedGroupId }) => {
+        if (deletedGroupId === groupId) {
+          navigate('/groups');
+        }
+      });
+
+      socket.on('groupNameChanged', ({ groupId: changedGroupId, newName }) => {
+        if (changedGroupId === groupId) {
+          setGroup(prev => ({ ...prev, name: newName }));
+        }
+      });
+
+      return () => {
+        socket.off('groupDeleted');
+        socket.off('groupNameChanged');
+      };
+    }
+  }, [socket, groupId, navigate]);
+
+  const renderPinnedMessages = () => (
+    <div className="pinned-messages">
+      <h4>📌 Pinned Messages</h4>
+      {messages.filter(m => m.isPinned).map(m => (
+        <div key={m._id} className="pinned-message">
+          <span>{m.sender.name}: </span>
+          <span>{m.message}</span>
+        </div>
+      ))}
+    </div>
+  );
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -679,29 +754,60 @@ export default function GroupChat({ currentUser }) {
     );
   }
 
+  const isAdmin = group.members?.some(m => m.user._id === currentUser.id && (m.role === 'admin' || m.role === 'moderator')) || group.admin._id === currentUser.id;
+
   return (
     <div className="fade-in">
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h2>🎯 {group.name}</h2>
-            <p className="text-light">
-              👥 {group.members?.length || 0} members • Group conversation
-            </p>
+            {showNameEdit ? (
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="New group name..."
+                />
+                <button onClick={handleNameChange}>Save</button>
+                <button onClick={() => setShowNameEdit(false)}>Cancel</button>
+              </div>
+            ) : (
+              <h2 style={{ marginBottom: '4px' }}>
+                {group?.name}
+                {isAdmin && (
+                  <button
+                    onClick={() => {
+                      setNewName(group.name);
+                      setShowNameEdit(true);
+                    }}
+                    style={{ marginLeft: '8px', fontSize: '14px' }}
+                  >
+                    ✏️
+                  </button>
+                )}
+              </h2>
+            )}
+            <p className="text-light">{group?.members?.length || 0} members</p>
           </div>
-          <Link to="/groups" style={{
-            padding: '10px 20px',
-            background: 'var(--accent-light)',
-            color: 'var(--primary-medium)',
-            borderRadius: '10px',
-            textDecoration: 'none',
-            fontWeight: '600',
-            transition: 'all 0.3s ease'
-          }}>
-            ← Back to Groups
-          </Link>
+          {isAdmin && (
+            <button
+              onClick={handleDeleteGroup}
+              style={{
+                background: '#ff6b6b',
+                color: 'white',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '8px'
+              }}
+            >
+              Delete Group
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Add pinned messages section */}
+      {messages.some(m => m.isPinned) && renderPinnedMessages()}
 
       <div className="card">
         <GroupTabs 

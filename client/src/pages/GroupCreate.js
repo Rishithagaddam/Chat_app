@@ -1,29 +1,47 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 
 export default function GroupCreate({ currentUser }) {
   const [users, setUsers] = useState([]);
   const [selected, setSelected] = useState(new Set());
   const [name, setName] = useState('');
   const [err, setErr] = useState('');
+  const [commonGroups, setCommonGroups] = useState({});
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
     (async () => {
       try {
-        // only allow creating groups from your contacts
-        const res = await api.get('/contacts');
-        const contactUsers = res.data.contacts || [];
+        const [contactsRes, groupsRes] = await Promise.all([
+          api.get('/contacts'),
+          api.get('/groups')
+        ]);
+        
+        const contactUsers = contactsRes.data.contacts || [];
+        const groups = groupsRes.data.groups || [];
+        
+        // Calculate common groups for each contact
+        const commonGroupsMap = {};
+        contactUsers.forEach(contact => {
+          commonGroupsMap[contact._id] = groups.filter(group => 
+            group.members.some(member => 
+              member.user?._id === contact._id || member.user === contact._id
+            )
+          );
+        });
+        
         setUsers(contactUsers);
-        // preselect from query string ?add=userid
+        setCommonGroups(commonGroupsMap);
+
+        // Handle preselection from query params
         const params = new URLSearchParams(location.search);
         const add = params.get('add');
         if (add) setSelected(new Set([add]));
       } catch (e) {
         if (e.response?.status === 401) setErr('Not authorized. Please login.');
-        else setErr('Failed to load users');
+        else setErr('Failed to load contacts');
       }
     })();
   }, [location.search]);
@@ -56,6 +74,73 @@ export default function GroupCreate({ currentUser }) {
       setErr(e.response?.data?.message || 'Failed to create group');
     }
   };
+
+  const ContactCard = ({ user }) => (
+    <div 
+      key={user._id} 
+      className="contact-card"
+      style={{ 
+        padding: '15px',
+        borderRadius: '10px',
+        background: selected.has(user._id) ? 'var(--accent-light)' : 'white',
+        border: '1px solid var(--border-color)',
+        marginBottom: '10px',
+        cursor: 'pointer',
+        transition: 'all 0.2s ease'
+      }}
+      onClick={() => toggle(user._id)}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
+            <h4 style={{ margin: 0 }}>{user.name}</h4>
+            {user.isOnline ? (
+              <span style={{ color: '#00b894', fontSize: '12px' }}>● Online</span>
+            ) : (
+              <span style={{ color: '#636e72', fontSize: '12px' }}>● Offline</span>
+            )}
+          </div>
+          <p style={{ margin: '0 0 5px 0', color: 'var(--text-light)', fontSize: '14px' }}>
+            {user.email}
+          </p>
+          {!user.isOnline && user.lastSeen && (
+            <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-light)' }}>
+              Last seen: {new Date(user.lastSeen).toLocaleString()}
+            </p>
+          )}
+        </div>
+        
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+          <input 
+            type="checkbox"
+            checked={selected.has(user._id)}
+            onChange={() => toggle(user._id)}
+            style={{ transform: 'scale(1.2)', cursor: 'pointer' }}
+          />
+          {commonGroups[user._id]?.length > 0 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/contacts/${user._id}/groups`);
+              }}
+              style={{
+                marginTop: '8px',
+                padding: '6px 12px',
+                fontSize: '12px',
+                background: 'var(--primary-light)',
+                color: 'var(--primary-dark)',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer'
+              }}
+            >
+              {commonGroups[user._id].length} Common Groups
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="fade-in">
@@ -99,66 +184,41 @@ export default function GroupCreate({ currentUser }) {
         </div>
         
         <div style={{ marginBottom: '30px' }}>
-          <label style={{ display: 'block', marginBottom: '16px', fontWeight: '600', color: 'var(--primary-dark)' }}>
+          <label style={{ 
+            display: 'block', 
+            marginBottom: '16px', 
+            fontWeight: '600', 
+            color: 'var(--primary-dark)' 
+          }}>
             👥 Select Members ({selected.size} selected)
           </label>
           
           {users.length === 0 ? (
             <div className="card text-center">
               <p className="text-light">No contacts available. Add some contacts first!</p>
+              <Link 
+                to="/users" 
+                style={{
+                  display: 'inline-block',
+                  marginTop: '15px',
+                  padding: '10px 20px',
+                  background: 'var(--gradient-primary)',
+                  color: 'white',
+                  borderRadius: '8px',
+                  textDecoration: 'none'
+                }}
+              >
+                Find Users
+              </Link>
             </div>
           ) : (
             <div style={{ 
               maxHeight: '400px', 
               overflowY: 'auto',
-              background: 'var(--white)',
-              border: '2px solid var(--border-color)',
-              borderRadius: '12px',
-              padding: '16px'
+              padding: '10px'
             }}>
-              {users.map(u => (
-                <div 
-                  key={u._id} 
-                  style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    padding: '12px',
-                    marginBottom: '8px',
-                    borderRadius: '8px',
-                    background: selected.has(u._id) ? 'var(--accent-light)' : 'transparent',
-                    border: selected.has(u._id) ? '2px solid var(--primary-light)' : '2px solid transparent',
-                    transition: 'all 0.3s ease',
-                    cursor: 'pointer'
-                  }}
-                  onClick={() => toggle(u._id)}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selected.has(u._id)}
-                    onChange={() => toggle(u._id)}
-                    style={{ marginRight: '12px', cursor: 'pointer' }}
-                  />
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <strong>{u.name}</strong>
-                      {u.isOnline ? (
-                        <span style={{ color: '#00b894', fontSize: '12px', fontWeight: '500' }}>
-                          ● Online
-                        </span>
-                      ) : (
-                        <span style={{ color: '#636e72', fontSize: '12px', fontWeight: '500' }}>
-                          ● Offline
-                        </span>
-                      )}
-                    </div>
-                    <small className="text-light">{u.email}</small>
-                    {!u.isOnline && u.lastSeen && (
-                      <small style={{ color: 'var(--text-light)', display: 'block' }}>
-                        Last seen: {new Date(u.lastSeen).toLocaleDateString()}
-                      </small>
-                    )}
-                  </div>
-                </div>
+              {users.map(user => (
+                <ContactCard key={user._id} user={user} />
               ))}
             </div>
           )}
