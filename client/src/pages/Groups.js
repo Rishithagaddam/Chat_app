@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 export default function Groups() {
   const [groups, setGroups] = useState([]);
   const [err, setErr] = useState('');
+  const navigate = useNavigate();
 
   useEffect(() => {
     (async () => {
@@ -26,18 +27,35 @@ export default function Groups() {
             <h2>🎯 Group Chats</h2>
             <p className="text-light">Join conversations with multiple people</p>
           </div>
-          <Link to="/groups/new" style={{
-            background: 'var(--gradient-primary)',
-            color: 'var(--white)',
-            padding: '12px 24px',
-            borderRadius: '12px',
-            textDecoration: 'none',
-            fontWeight: '600',
-            boxShadow: '0 8px 25px rgba(139, 74, 74, 0.3)',
-            transition: 'all 0.3s ease'
-          }}>
-            ✨ Create Group
-          </Link>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <button
+              onClick={() => navigate(-1)}
+              style={{
+                padding: '10px 20px',
+                background: 'var(--accent-light)',
+                color: 'var(--primary-medium)',
+                borderRadius: '10px',
+                border: 'none',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease'
+              }}
+            >
+              ← Back
+            </button>
+            <Link to="/groups/new" style={{
+              background: 'var(--gradient-primary)',
+              color: 'var(--white)',
+              padding: '12px 24px',
+              borderRadius: '12px',
+              textDecoration: 'none',
+              fontWeight: '600',
+              boxShadow: '0 8px 25px rgba(139, 74, 74, 0.3)',
+              transition: 'all 0.3s ease'
+            }}>
+              ✨ Create Group
+            </Link>
+          </div>
         </div>
       </div>
       

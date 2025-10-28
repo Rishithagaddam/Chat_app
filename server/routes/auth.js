@@ -225,10 +225,13 @@ router.get('/me', authMiddleware, async (req, res) => {
 // @access  Private
 router.post('/logout', authMiddleware, async (req, res) => {
   try {
+    // Update user status to offline with current timestamp
     await User.findByIdAndUpdate(req.user._id, {
       isOnline: false,
       lastSeen: new Date()
     });
+
+    console.log(`User ${req.user.name} logged out and marked offline`);
 
     res.json({
       success: true,

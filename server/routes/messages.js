@@ -425,6 +425,55 @@ router.get('/group/:groupId', authMiddleware, async (req, res) => {
   }
 });
 
+// @route   GET /api/messages/group/:groupId/media
+// @desc    Get media files for a group
+// @access  Private
+router.get('/group/:groupId/media', authMiddleware, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const userId = req.user._id;
+
+    // Check if group exists and user is a member
+    const Group = require('../models/Group');
+    const group = await Group.findById(groupId);
+    
+    if (!group) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found'
+      });
+    }
+
+    if (!group.isMember(userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not a member of this group'
+      });
+    }
+
+    // Get media messages for this group
+    const mediaMessages = await Message.find({
+      group: groupId,
+      messageType: { $in: ['image', 'video', 'audio', 'file'] },
+      isDeleted: false
+    })
+    .populate('sender', 'name email')
+    .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      count: mediaMessages.length,
+      media: mediaMessages
+    });
+  } catch (error) {
+    console.error('Get group media error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching group media'
+    });
+  }
+});
+
 // @route   POST /api/messages/group
 // @desc    Send a message to a group
 // @access  Private
@@ -505,6 +554,452 @@ router.post('/group', authMiddleware, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Server error while sending message'
+    });
+  }
+});
+
+// @route   PUT /api/messages/:messageId/edit
+// @desc    Edit a message (within time limit)
+// @access  Private
+router.put('/:messageId/edit', authMiddleware, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { message: newContent } = req.body;
+    const userId = req.user._id;
+
+    if (!newContent || !newContent.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Message content is required'
+      });
+    }
+
+    const message = await Message.findById(messageId);
+    if (!message || message.isDeleted) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message not found'
+      });
+    }
+
+    if (!message.canEdit(userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Cannot edit this message. Edit time limit exceeded or insufficient permissions.'
+      });
+    }
+
+    message.editMessage(newContent.trim());
+    await message.save();
+
+    await message.populate('sender', 'name email');
+
+    // Emit real-time update
+    const io = req.app.get('socketio');
+    if (io) {
+      if (message.receiver) {
+        const roomId = [message.sender._id.toString(), message.receiver.toString()].sort().join('_');
+        io.to(roomId).emit('messageEdited', { messageId, newContent: message.message, isEdited: true });
+      } else if (message.group) {
+        io.to(message.group.toString()).emit('messageEdited', { 
+          messageId, 
+          newContent: message.message, 
+          isEdited: true 
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Message edited successfully',
+      data: message
+    });
+  } catch (error) {
+    console.error('Edit message error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while editing message'
+    });
+  }
+});
+
+// @route   DELETE /api/messages/:messageId
+// @desc    Delete a message (soft delete)
+// @access  Private
+router.delete('/:messageId', authMiddleware, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const userId = req.user._id;
+
+    const message = await Message.findById(messageId);
+    if (!message || message.isDeleted) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message not found'
+      });
+    }
+
+    if (!message.canDelete(userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Cannot delete this message. Insufficient permissions.'
+      });
+    }
+
+    message.isDeleted = true;
+    message.deletedAt = new Date();
+    message.deletedBy = userId;
+    await message.save();
+
+    // Emit real-time update
+    const io = req.app.get('socketio');
+    if (io) {
+      if (message.receiver) {
+        const roomId = [message.sender._id.toString(), message.receiver.toString()].sort().join('_');
+        io.to(roomId).emit('messageDeleted', { messageId });
+      } else if (message.group) {
+        io.to(message.group.toString()).emit('messageDeleted', { messageId });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Message deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete message error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while deleting message'
+    });
+  }
+});
+
+// @route   POST /api/messages/:messageId/react
+// @desc    Add or remove reaction to a message
+// @access  Private
+router.post('/:messageId/react', authMiddleware, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { emoji } = req.body;
+    const userId = req.user._id;
+
+    if (!emoji) {
+      return res.status(400).json({
+        success: false,
+        message: 'Emoji is required'
+      });
+    }
+
+    const message = await Message.findById(messageId);
+    if (!message || message.isDeleted) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message not found'
+      });
+    }
+
+    // Check if user already reacted with this emoji
+    const existingReaction = message.reactions.find(r => 
+      r.user.toString() === userId.toString() && r.emoji === emoji
+    );
+
+    if (existingReaction) {
+      // Remove reaction
+      message.removeReaction(userId, emoji);
+    } else {
+      // Add reaction
+      message.addReaction(userId, emoji);
+    }
+
+    await message.save();
+    await message.populate('reactions.user', 'name');
+
+    // Emit real-time update
+    const io = req.app.get('socketio');
+    if (io) {
+      const reactionData = { 
+        messageId, 
+        reactions: message.reactions,
+        userId,
+        emoji,
+        action: existingReaction ? 'removed' : 'added'
+      };
+      
+      if (message.receiver) {
+        const roomId = [message.sender._id.toString(), message.receiver.toString()].sort().join('_');
+        io.to(roomId).emit('messageReaction', reactionData);
+      } else if (message.group) {
+        io.to(message.group.toString()).emit('messageReaction', reactionData);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: existingReaction ? 'Reaction removed' : 'Reaction added',
+      data: { reactions: message.reactions }
+    });
+  } catch (error) {
+    console.error('Message reaction error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while processing reaction'
+    });
+  }
+});
+
+// @route   POST /api/messages/:messageId/pin
+// @desc    Pin or unpin a message
+// @access  Private
+router.post('/:messageId/pin', authMiddleware, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const userId = req.user._id;
+
+    const message = await Message.findById(messageId);
+    if (!message || message.isDeleted) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message not found'
+      });
+    }
+
+    // Check permissions - only group admins or message sender can pin
+    if (message.group) {
+      const Group = require('../models/Group');
+      const group = await Group.findById(message.group);
+      if (!group || (group.admin.toString() !== userId.toString() && message.sender.toString() !== userId.toString())) {
+        return res.status(403).json({
+          success: false,
+          message: 'Only group admins or message senders can pin messages'
+        });
+      }
+    }
+
+    // Toggle pin status
+    message.isPinned = !message.isPinned;
+    if (message.isPinned) {
+      message.pinnedBy = userId;
+      message.pinnedAt = new Date();
+    } else {
+      message.pinnedBy = undefined;
+      message.pinnedAt = undefined;
+    }
+
+    await message.save();
+
+    // Emit real-time update
+    const io = req.app.get('socketio');
+    if (io) {
+      const pinData = { 
+        messageId, 
+        isPinned: message.isPinned,
+        pinnedBy: userId,
+        pinnedAt: message.pinnedAt
+      };
+      
+      if (message.receiver) {
+        const roomId = [message.sender._id.toString(), message.receiver.toString()].sort().join('_');
+        io.to(roomId).emit('messagePinned', pinData);
+      } else if (message.group) {
+        io.to(message.group.toString()).emit('messagePinned', pinData);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: message.isPinned ? 'Message pinned' : 'Message unpinned',
+      data: { isPinned: message.isPinned }
+    });
+  } catch (error) {
+    console.error('Pin message error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while pinning message'
+    });
+  }
+});
+
+// @route   POST /api/messages/:messageId/forward
+// @desc    Forward a message to another user/group
+// @access  Private
+router.post('/:messageId/forward', authMiddleware, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { receiverId, groupId } = req.body;
+    const userId = req.user._id;
+
+    if (!receiverId && !groupId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Either receiverId or groupId is required'
+      });
+    }
+
+    const originalMessage = await Message.findById(messageId).populate('sender', 'name');
+    if (!originalMessage || originalMessage.isDeleted) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message not found'
+      });
+    }
+
+    // Create forwarded message
+    const forwardedMessage = new Message({
+      sender: userId,
+      receiver: receiverId,
+      group: groupId,
+      message: originalMessage.message,
+      messageType: originalMessage.messageType,
+      fileUrl: originalMessage.fileUrl,
+      fileName: originalMessage.fileName,
+      fileSize: originalMessage.fileSize,
+      mimeType: originalMessage.mimeType,
+      duration: originalMessage.duration,
+      dimensions: originalMessage.dimensions,
+      thumbnailUrl: originalMessage.thumbnailUrl,
+      isForwarded: true,
+      forwardedFrom: messageId
+    });
+
+    await forwardedMessage.save();
+    await forwardedMessage.populate('sender', 'name email');
+
+    // Emit real-time event
+    const io = req.app.get('socketio');
+    if (io) {
+      if (receiverId) {
+        const roomId = [userId.toString(), receiverId].sort().join('_');
+        io.to(roomId).emit('receiveMessage', forwardedMessage);
+      } else if (groupId) {
+        io.to(groupId).emit('receiveGroupMessage', {
+          groupId,
+          message: forwardedMessage
+        });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Message forwarded successfully',
+      data: forwardedMessage
+    });
+  } catch (error) {
+    console.error('Forward message error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while forwarding message'
+    });
+  }
+});
+
+// @route   POST /api/messages/quote
+// @desc    Send a message quoting another message
+// @access  Private
+router.post('/quote', authMiddleware, async (req, res) => {
+  try {
+    const { quotedMessageId, receiverId, groupId, message } = req.body;
+    const userId = req.user._id;
+
+    if (!receiverId && !groupId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Either receiverId or groupId is required'
+      });
+    }
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Message content is required'
+      });
+    }
+
+    const quotedMessage = await Message.findById(quotedMessageId);
+    if (!quotedMessage || quotedMessage.isDeleted) {
+      return res.status(404).json({
+        success: false,
+        message: 'Quoted message not found'
+      });
+    }
+
+    // Create new message with quote
+    const newMessage = new Message({
+      sender: userId,
+      receiver: receiverId,
+      group: groupId,
+      message: message.trim(),
+      messageType: 'text',
+      quotedMessage: quotedMessageId
+    });
+
+    await newMessage.save();
+    await newMessage.populate('sender', 'name email');
+    await newMessage.populate('quotedMessage');
+
+    // Emit real-time event
+    const io = req.app.get('socketio');
+    if (io) {
+      if (receiverId) {
+        const roomId = [userId.toString(), receiverId].sort().join('_');
+        io.to(roomId).emit('receiveMessage', newMessage);
+      } else if (groupId) {
+        io.to(groupId).emit('receiveGroupMessage', {
+          groupId,
+          message: newMessage
+        });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Quoted message sent successfully',
+      data: newMessage
+    });
+  } catch (error) {
+    console.error('Quote message error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while sending quoted message'
+    });
+  }
+});
+
+// @route   GET /api/messages/:chatId/pinned
+// @desc    Get pinned messages for a chat/group
+// @access  Private
+router.get('/:chatId/pinned', authMiddleware, async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const { type } = req.query; // 'direct' or 'group'
+    const userId = req.user._id;
+
+    let query = { isPinned: true, isDeleted: false };
+
+    if (type === 'group') {
+      query.group = chatId;
+    } else {
+      query.$or = [
+        { sender: userId, receiver: chatId },
+        { sender: chatId, receiver: userId }
+      ];
+    }
+
+    const pinnedMessages = await Message.find(query)
+      .populate('sender', 'name email')
+      .populate('pinnedBy', 'name')
+      .sort({ pinnedAt: -1 });
+
+    res.json({
+      success: true,
+      count: pinnedMessages.length,
+      data: pinnedMessages
+    });
+  } catch (error) {
+    console.error('Get pinned messages error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching pinned messages'
     });
   }
 });

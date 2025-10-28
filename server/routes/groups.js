@@ -413,4 +413,151 @@ router.post('/:groupId/messages', authMiddleware, async (req, res) => {
   }
 });
 
+// @route   PUT /api/groups/:groupId/members/:memberId/role
+// @desc    Update member role in group
+// @access  Private
+router.put('/:groupId/members/:memberId/role', authMiddleware, async (req, res) => {
+  try {
+    const { groupId, memberId } = req.params;
+    const { role } = req.body;
+    const userId = req.user._id;
+
+    console.log('Updating member role:', { groupId, memberId, role, userId: userId.toString() });
+
+    // Validate role
+    if (!['admin', 'moderator', 'member'].includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid role. Must be admin, moderator, or member'
+      });
+    }
+
+    // Check if group exists
+    const group = await Group.findById(groupId);
+    if (!group || !group.isActive) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found'
+      });
+    }
+
+    // Check if current user is admin
+    if (!group.isAdmin(userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only admins can change member roles'
+      });
+    }
+
+    // Check if target member exists in group
+    if (!group.isMember(memberId)) {
+      return res.status(404).json({
+        success: false,
+        message: 'Member not found in group'
+      });
+    }
+
+    // Cannot change own role
+    if (userId.toString() === memberId.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot change your own role'
+      });
+    }
+
+    // Update member role
+    const updated = group.updateMemberRole(memberId, role);
+    if (!updated) {
+      return res.status(400).json({
+        success: false,
+        message: 'Failed to update member role'
+      });
+    }
+
+    await group.save();
+
+    // Populate the updated group
+    const updatedGroup = await Group.findById(groupId)
+      .populate('admin', 'name email')
+      .populate('members.user', 'name email isOnline');
+
+    res.json({
+      success: true,
+      message: `Member role updated to ${role}`,
+      group: updatedGroup
+    });
+  } catch (error) {
+    console.error('Update member role error:', error);
+    
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid group or member ID'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Server error while updating member role'
+    });
+  }
+});
+
+// @route   DELETE /api/groups/:groupId/members/:memberId
+// @desc    Remove member from group
+// @access  Private
+router.delete('/:groupId/members/:memberId', authMiddleware, async (req, res) => {
+  try {
+    const { groupId, memberId } = req.params;
+    const userId = req.user._id;
+
+    const group = await Group.findById(groupId);
+    if (!group || !group.isActive) {
+      return res.status(404).json({
+        success: false,
+        message: 'Group not found'
+      });
+    }
+
+    // Check permissions (admin or removing self)
+    const canRemove = group.isAdmin(userId) || userId.toString() === memberId.toString();
+    if (!canRemove) {
+      return res.status(403).json({
+        success: false,
+        message: 'Insufficient permissions to remove member'
+      });
+    }
+
+    // Cannot remove group admin
+    if (group.admin.toString() === memberId.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot remove group admin'
+      });
+    }
+
+    // Remove member
+    const removed = group.removeMember(memberId);
+    if (!removed) {
+      return res.status(404).json({
+        success: false,
+        message: 'Member not found in group'
+      });
+    }
+
+    await group.save();
+
+    res.json({
+      success: true,
+      message: 'Member removed from group'
+    });
+  } catch (error) {
+    console.error('Remove member error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while removing member'
+    });
+  }
+});
+
 module.exports = router;

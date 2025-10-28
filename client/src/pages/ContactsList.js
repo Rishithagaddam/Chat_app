@@ -1,10 +1,11 @@
 import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchContacts } from '../features/contacts/contactsSlice';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 export default function ContactsList() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { contacts } = useSelector(s => s.contacts);
 
   useEffect(() => {
@@ -14,8 +15,27 @@ export default function ContactsList() {
   return (
     <div className="fade-in">
       <div className="card">
-        <h2>👥 My Contacts ({contacts.length})</h2>
-        <p className="text-light">Your trusted connections</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h2>👥 My Contacts ({contacts.length})</h2>
+            <p className="text-light">Your trusted connections</p>
+          </div>
+          <button
+            onClick={() => navigate(-1)}
+            style={{
+              padding: '10px 20px',
+              background: 'var(--accent-light)',
+              color: 'var(--primary-medium)',
+              borderRadius: '10px',
+              border: 'none',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease'
+            }}
+          >
+            ← Back
+          </button>
+        </div>
       </div>
       
       {contacts.length === 0 ? (
@@ -42,10 +62,19 @@ export default function ContactsList() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                 <h3>
                   {c.name}
-                  {c.isOnline && <span style={{ color: '#00b894', fontSize: '12px', marginLeft: '8px' }}>● Online</span>}
+                  {c.isOnline ? (
+                    <span style={{ color: '#00b894', fontSize: '12px', marginLeft: '8px' }}>● Online</span>
+                  ) : (
+                    <span style={{ color: '#636e72', fontSize: '12px', marginLeft: '8px' }}>● Offline</span>
+                  )}
                 </h3>
               </div>
               <p>Email: {c.email}</p>
+              {!c.isOnline && c.lastSeen && (
+                <p style={{ fontSize: '12px', color: 'var(--text-light)' }}>
+                  Last seen: {new Date(c.lastSeen).toLocaleString()}
+                </p>
+              )}
               <div style={{ marginTop: '15px' }}>
                 <Link to={`/chat/${c._id}`} style={{
                   display: 'inline-block',

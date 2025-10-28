@@ -48,6 +48,93 @@
   animation: pulse 2s infinite;
 }
 
+/* Message Controls Styles */
+.msg {
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.msg:hover {
+  background: rgba(255, 255, 255, 0.05);
+  transform: translateY(-1px);
+}
+
+.msg:hover .controls-trigger {
+  display: flex !important;
+}
+
+.controls-trigger {
+  transition: all 0.2s ease;
+}
+
+.controls-trigger:hover {
+  transform: scale(1.1);
+  background: var(--primary-dark) !important;
+}
+
+/* Reaction Animations */
+.msg .reactions span {
+  transition: transform 0.2s ease;
+}
+
+.msg .reactions span:hover {
+  transform: scale(1.1);
+}
+
+/* Pinned Message Indicator */
+.pinned-indicator {
+  animation: pulse 2s infinite;
+}
+
+/* Edit Mode Styles */
+.message-editing {
+  background: var(--accent-light);
+  border: 2px dashed var(--primary-light);
+}
+
+/* Forward Modal Styles */
+.forward-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.forward-modal-content {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+}
+
+/* Quote Preview Styles */
+.quote-preview {
+  border-left: 4px solid var(--primary-medium);
+  background: rgba(0, 0, 0, 0.05);
+  padding: 8px 12px;
+  margin: 8px 0;
+  border-radius: 0 8px 8px 0;
+}
+
+/* Deleted Message Styles */
+.msg.deleted {
+  opacity: 0.6;
+  filter: grayscale(0.5);
+}
+
+.msg.deleted .msg-text {
+  font-style: italic;
+  color: var(--text-light);
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .app-shell header {
@@ -81,6 +168,26 @@
   .msg {
     max-width: 85%;
     padding: 12px 16px;
+  }
+  
+  .controls-trigger {
+    width: 24px !important;
+    height: 24px !important;
+    font-size: 12px !important;
+  }
+  
+  .message-controls button {
+    padding: 4px 8px !important;
+    font-size: 10px !important;
+  }
+  
+  .reactions-panel {
+    flex-wrap: wrap;
+    gap: 4px !important;
+  }
+  
+  .reactions-panel span {
+    font-size: 16px !important;
   }
 }
 

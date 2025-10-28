@@ -609,13 +609,79 @@ const MediaMessages = ({ message, isSent, senderName }) => {
 
   switch (messageType) {
     case 'image':
-      return <ImageMessage message={message} isOwn={isSent} />;
+      return (
+        <div className="media-message" style={{ maxWidth: '280px', borderRadius: '12px', overflow: 'hidden' }}>
+          <img 
+            src={fileUrl.startsWith('blob:') ? fileUrl : `${baseUrl}${fileUrl}`}
+            alt={fileName || 'Image'}
+            style={{ 
+              width: '100%', 
+              height: 'auto',
+              display: 'block',
+              cursor: 'pointer',
+              borderRadius: '8px'
+            }}
+            onClick={() => {
+              const fullUrl = fileUrl.startsWith('blob:') ? fileUrl : `${baseUrl}${fileUrl}`;
+              window.open(fullUrl, '_blank');
+            }}
+          />
+          {message.message && (
+            <div style={{ 
+              padding: '8px', 
+              background: 'rgba(0,0,0,0.7)', 
+              color: 'white',
+              fontSize: '12px',
+              borderRadius: '0 0 8px 8px'
+            }}>
+              {message.message}
+            </div>
+          )}
+          <div style={{ 
+            padding: '4px 8px', 
+            fontSize: '10px', 
+            color: 'var(--text-light)',
+            background: 'rgba(255,255,255,0.9)'
+          }}>
+            📷 {formatFileSize(fileSize)}
+          </div>
+        </div>
+      );
+
+    case 'video':
+      return (
+        <div className="media-message" style={{ maxWidth: '280px', borderRadius: '12px', overflow: 'hidden' }}>
+          <video 
+            controls 
+            style={{ width: '100%', height: 'auto', borderRadius: '8px' }}
+            preload="metadata"
+          >
+            <source src={fileUrl.startsWith('blob:') ? fileUrl : `${baseUrl}${fileUrl}`} type={mimeType} />
+            Your browser does not support video playback.
+          </video>
+          <div style={{ 
+            padding: '6px 8px', 
+            background: 'var(--accent-light)',
+            fontSize: '11px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <span style={{ fontWeight: '600', color: 'var(--text-dark)' }}>🎥 {fileName}</span>
+            <span style={{ color: 'var(--text-light)' }}>{formatDuration(duration)}</span>
+          </div>
+          {message.message && (
+            <div style={{ padding: '8px', fontSize: '13px', borderTop: '1px solid var(--border-color)' }}>
+              {message.message}
+            </div>
+          )}
+        </div>
+      );
+
     case 'audio':
       return <AudioMessage message={message} isOwn={isSent} />;
     case 'voice':
       return <VoiceMessage message={message} isOwn={isSent} />;
-    case 'video':
-      return <VideoMessage message={message} isOwn={isSent} />;
     case 'file':
       return <FileMessage message={message} isOwn={isSent} />;
     default:

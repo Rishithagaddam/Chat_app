@@ -104,11 +104,11 @@ app.get('/api/groups/:groupId/messages', (req, res) => {
     });
   }
   
-  // Return sample messages
+  // Return sample messages with proper structure
   const messages = [
     {
       _id: 'msg1_' + Date.now(),
-      content: `Welcome to ${group.name}! 🎉`,
+      message: `Welcome to ${group.name}! 🎉`,
       sender: {
         _id: 'admin_user',
         name: 'Admin User',
@@ -121,7 +121,7 @@ app.get('/api/groups/:groupId/messages', (req, res) => {
     },
     {
       _id: 'msg2_' + Date.now(),
-      content: 'This group chat is working perfectly! 💪',
+      message: 'This group chat is working perfectly! 💪',
       sender: {
         _id: 'member_1',
         name: 'Member 1', 
@@ -136,6 +136,96 @@ app.get('/api/groups/:groupId/messages', (req, res) => {
   
   console.log('✅ Returning', messages.length, 'messages');
   res.json({ success: true, messages });
+});
+
+// Get Group Announcements
+app.get('/api/announcements/group/:groupId', (req, res) => {
+  const { groupId } = req.params;
+  console.log('📢 GET /api/announcements/group/' + groupId);
+  
+  const announcements = [
+    {
+      _id: 'ann_' + Date.now(),
+      title: 'Welcome to the Group!',
+      content: 'This is our first announcement. Feel free to share your thoughts and ideas here.',
+      author: {
+        _id: 'admin_user',
+        name: 'Admin User',
+        email: 'admin@example.com'
+      },
+      priority: 'high',
+      isPinned: true,
+      createdAt: new Date(Date.now() - 86400000) // 1 day ago
+    }
+  ];
+  
+  res.json({ success: true, announcements });
+});
+
+// Get Group Polls  
+app.get('/api/polls/group/:groupId', (req, res) => {
+  const { groupId } = req.params;
+  console.log('📊 GET /api/polls/group/' + groupId);
+  
+  const polls = [
+    {
+      _id: 'poll_' + Date.now(),
+      title: 'What should we discuss in our next meeting?',
+      description: 'Help us decide the agenda for our upcoming group meeting.',
+      creator: {
+        _id: 'admin_user',
+        name: 'Admin User',
+        email: 'admin@example.com'
+      },
+      results: [
+        {
+          _id: 'opt1',
+          text: 'Project Updates',
+          voteCount: 5,
+          percentage: 50
+        },
+        {
+          _id: 'opt2',
+          text: 'Budget Planning',
+          voteCount: 3,
+          percentage: 30
+        },
+        {
+          _id: 'opt3',
+          text: 'Team Building',
+          voteCount: 2,
+          percentage: 20
+        }
+      ],
+      totalVotes: 10,
+      hasVoted: false,
+      createdAt: new Date(Date.now() - 43200000) // 12 hours ago
+    }
+  ];
+  
+  res.json({ success: true, polls });
+});
+
+// Get Group Media
+app.get('/api/messages/group/:groupId/media', (req, res) => {
+  const { groupId } = req.params;
+  console.log('🖼️ GET /api/messages/group/' + groupId + '/media');
+  
+  const mediaFiles = [
+    {
+      _id: 'media1_' + Date.now(),
+      messageType: 'image',
+      fileName: 'sample-image.jpg',
+      fileUrl: '/uploads/sample-image.jpg',
+      sender: {
+        _id: 'member_1',
+        name: 'Member 1'
+      },
+      createdAt: new Date(Date.now() - 172800000) // 2 days ago
+    }
+  ];
+  
+  res.json({ success: true, media: mediaFiles });
 });
 
 // Send Message to Group
@@ -244,4 +334,10 @@ app.listen(PORT, () => {
   console.log(`   GET  /api/groups/:id - Get group details`);
   console.log(`   GET  /api/groups/:id/messages - Get messages`);
   console.log(`   POST /api/groups/:id/messages - Send message`);
+  console.log(`   GET  /api/announcements/group/:id - Get announcements`);
+  console.log(`   POST /api/announcements - Create announcement`);
+  console.log(`   GET  /api/polls/group/:id - Get polls`);
+  console.log(`   POST /api/polls - Create poll`);
+  console.log(`   POST /api/polls/:id/vote - Vote on poll`);
+  console.log(`   GET  /api/messages/group/:id/media - Get media files`);
 });

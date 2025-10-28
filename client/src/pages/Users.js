@@ -1,10 +1,11 @@
 import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchUsers, sendRequest, fetchRequests, fetchContacts } from '../features/contacts/contactsSlice';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 export default function Users() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { users, loading, error, requestsSent, contacts } = useSelector(s => s.contacts);
   const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
 
@@ -24,8 +25,30 @@ export default function Users() {
   return (
     <div className="fade-in">
       <div className="card">
-        <h2>🌟 Discover Users</h2>
-        <p className="text-light">Connect with people and start conversations</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h2>🌟 Discover Users</h2>
+            <p className="text-light">Connect with people and start conversations</p>
+          </div>
+          {/* <button
+            onClick={() => navigate(-1)}
+            style={{
+              padding: '10px 20px',
+              background: 'var(--accent-light)',
+              color: 'var(--primary-medium)',
+              borderRadius: '10px',
+              border: 'none',
+              fontWeight: '600',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.3s ease'
+            }}
+          >
+            ← Back
+          </button> */}
+        </div>
       </div>
       
       {error && <div className="error">{error}</div>}
@@ -85,11 +108,6 @@ export default function Users() {
         </div>
       )}
       
-      <div className="card text-center" style={{ marginTop: '30px' }}>
-        <Link to="/requests" style={{ marginRight: '20px' }}>📩 Contact Requests</Link>
-        <span style={{ color: 'var(--text-light)' }}>|</span>
-        <Link to="/contacts" style={{ marginLeft: '20px' }}>👥 My Contacts</Link>
-      </div>
     </div>
   );
 }

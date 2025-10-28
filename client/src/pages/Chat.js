@@ -4,6 +4,7 @@ import { useParams, Navigate } from 'react-router-dom';
 import { getSocket } from '../socket';
 import MediaUpload from '../components/MediaUpload';
 import MediaMessages from '../components/MediaMessages';
+import MessageControls from '../components/MessageControls';
 import { useSelector } from 'react-redux';
 
 export default function Chat({ currentUser }) {
@@ -12,6 +13,8 @@ export default function Chat({ currentUser }) {
   const [other, setOther] = useState(null);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [quotedMessage, setQuotedMessage] = useState(null);
+  const [forwardingMessage, setForwardingMessage] = useState(null);
   const socket = getSocket();
   const endRef = useRef(null);
   
@@ -97,8 +100,45 @@ export default function Chat({ currentUser }) {
       });
     };
 
+    // Listen for message updates
+    const handleMessageEdited = (data) => {
+      setMessages(prev => prev.map(m => 
+        m._id === data.messageId 
+          ? { ...m, message: data.newContent, isEdited: true }
+          : m
+      ));
+    };
+
+    const handleMessageDeleted = (data) => {
+      setMessages(prev => prev.map(m => 
+        m._id === data.messageId 
+          ? { ...m, isDeleted: true, message: 'This message was deleted' }
+          : m
+      ));
+    };
+
+    const handleMessageReaction = (data) => {
+      setMessages(prev => prev.map(m => 
+        m._id === data.messageId 
+          ? { ...m, reactions: data.reactions }
+          : m
+      ));
+    };
+
+    const handleMessagePinned = (data) => {
+      setMessages(prev => prev.map(m => 
+        m._id === data.messageId 
+          ? { ...m, isPinned: data.isPinned }
+          : m
+      ));
+    };
+
     socket.on('receiveMessage', handleReceiveMessage);
     socket.on('messageDelivered', handleMessageDelivered);
+    socket.on('messageEdited', handleMessageEdited);
+    socket.on('messageDeleted', handleMessageDeleted);
+    socket.on('messageReaction', handleMessageReaction);
+    socket.on('messagePinned', handleMessagePinned);
 
     // Remove newMessage handler as it causes duplicates
     // socket.on('newMessage', handleNewMessage);
@@ -106,6 +146,10 @@ export default function Chat({ currentUser }) {
     return () => {
       socket.off('receiveMessage', handleReceiveMessage);
       socket.off('messageDelivered', handleMessageDelivered);
+      socket.off('messageEdited', handleMessageEdited);
+      socket.off('messageDeleted', handleMessageDeleted);
+      socket.off('messageReaction', handleMessageReaction);
+      socket.off('messagePinned', handleMessagePinned);
       // leave the conversation room
       try {
         const roomId = [String(currentUser?.id || currentUser?._id), String(otherId)].sort().join('_');
@@ -200,6 +244,61 @@ export default function Chat({ currentUser }) {
     return <Navigate to="/users" replace />;
   }
   
+  const handleMessageEdit = (messageId, newContent) => {
+    setMessages(prev => prev.map(m => 
+      m._id === messageId 
+        ? { ...m, message: newContent, isEdited: true }
+        : m
+    ));
+  };
+
+  const handleMessageDelete = (messageId) => {
+    setMessages(prev => prev.map(m => 
+      m._id === messageId 
+        ? { ...m, isDeleted: true, message: 'This message was deleted' }
+        : m
+    ));
+  };
+
+  const handleMessageReact = (messageId, emoji) => {
+    // Real-time update will be handled by socket
+  };
+
+  const handleMessagePin = (messageId) => {
+    // Real-time update will be handled by socket
+  };
+
+  const handleMessageForward = (message) => {
+    setForwardingMessage(message);
+  };
+
+  const handleMessageQuote = (message) => {
+    setQuotedMessage(message);
+  };
+
+  const sendQuotedMessage = async (e) => {
+    e.preventDefault();
+    if (!text.trim() || sending || !quotedMessage) return;
+    
+    setSending(true);
+    try {
+      await api.post('/messages/quote', {
+        quotedMessageId: quotedMessage._id,
+        receiverId: otherId,
+        message: text
+      });
+      setText('');
+      setQuotedMessage(null);
+      // Refresh messages
+      const res = await api.get(`/messages/${otherId}`);
+      setMessages(res.data.messages || []);
+    } catch (err) {
+      console.error('Failed to send quoted message:', err);
+    } finally {
+      setSending(false);
+    }
+  };
+
   return (
     <div className="fade-in">
       <div className="card">
@@ -219,24 +318,73 @@ export default function Chat({ currentUser }) {
             const mine = senderId === String(currentUser.id || currentUser._id);
             
             return (
-              <div key={m._id} className={mine ? 'msg me' : 'msg'} style={{ animationDelay: '0.1s' }}>
-                {/* Render different message types */}
-                {m.messageType === 'text' || !m.messageType ? (
-                  <div className="msg-text">{m.message}</div>
-                ) : (
-                  <MediaMessages 
-                    message={m} 
-                    isSent={mine}
-                    senderName={m.sender?.name || 'Unknown'}
-                  />
-                )}
-                
-                <div className="msg-meta">
-                  {new Date(m.createdAt || m.updatedAt || Date.now()).toLocaleTimeString([], { 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                  })}
-                  {m.pending && <span style={{ marginLeft: '8px' }}>⏳</span>}
+              <div 
+                key={m._id} 
+                className={mine ? 'msg me' : 'msg'} 
+                style={{ 
+                  animationDelay: '0.1s',
+                  opacity: m.isDeleted ? 0.5 : 1
+                }}
+              >
+                <div className="msg-content">
+                  <div className="msg-text-wrapper">
+                    {/* Quoted Message Display */}
+                    {m.quotedMessage && (
+                      <div style={{
+                        background: 'rgba(0,0,0,0.1)',
+                        padding: '8px',
+                        borderRadius: '8px',
+                        marginBottom: '8px',
+                        borderLeft: '3px solid var(--primary-medium)',
+                        fontSize: '12px'
+                      }}>
+                        <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                          Replying to: {m.quotedMessage.sender?.name || 'Unknown'}
+                        </div>
+                        <div style={{ fontStyle: 'italic' }}>
+                          {m.quotedMessage.message || 'Media message'}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Message Content */}
+                    {m.isDeleted ? (
+                      <div className="msg-text" style={{ fontStyle: 'italic', color: 'var(--text-light)' }}>
+                        This message was deleted
+                      </div>
+                    ) : m.messageType === 'text' || !m.messageType ? (
+                      <div className="msg-text">{m.message}</div>
+                    ) : (
+                      <MediaMessages 
+                        message={m} 
+                        isSent={mine}
+                        senderName={m.sender?.name || 'Unknown'}
+                      />
+                    )}
+                    
+                    <div className="msg-meta">
+                      {new Date(m.createdAt || m.updatedAt || Date.now()).toLocaleTimeString([], { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      })}
+                      {m.pending && <span style={{ marginLeft: '8px' }}>⏳</span>}
+                    </div>
+                  </div>
+
+                  {/* Always Visible Message Controls */}
+                  <div className="msg-controls-wrapper">
+                    <MessageControls
+                      message={m}
+                      currentUser={currentUser}
+                      onEdit={handleMessageEdit}
+                      onDelete={handleMessageDelete}
+                      onReact={handleMessageReact}
+                      onPin={handleMessagePin}
+                      onForward={handleMessageForward}
+                      onQuote={handleMessageQuote}
+                      isGroupChat={false}
+                    />
+                  </div>
                 </div>
               </div>
             );
@@ -255,6 +403,40 @@ export default function Chat({ currentUser }) {
         flexDirection: 'column',
         gap: '16px'
       }}>
+        {/* Quoted Message Preview */}
+        {quotedMessage && (
+          <div style={{
+            background: 'var(--accent-light)',
+            padding: '12px',
+            borderRadius: '12px',
+            border: '1px solid var(--primary-light)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <div>
+              <div style={{ fontSize: '12px', color: 'var(--text-light)' }}>
+                Replying to: {quotedMessage.sender?.name || 'Unknown'}
+              </div>
+              <div style={{ fontSize: '14px', marginTop: '4px' }}>
+                {quotedMessage.message || 'Media message'}
+              </div>
+            </div>
+            <button
+              onClick={() => setQuotedMessage(null)}
+              style={{
+                background: 'none',
+                border: 'none',
+                fontSize: '18px',
+                cursor: 'pointer',
+                color: 'var(--text-light)'
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* Media Upload Buttons */}
         <MediaUpload 
           onSend={handleMediaSend}
@@ -263,7 +445,7 @@ export default function Chat({ currentUser }) {
         />
         
         {/* Text Message Form */}
-        <form onSubmit={send} style={{ 
+        <form onSubmit={quotedMessage ? sendQuotedMessage : send} style={{ 
           display: 'flex', 
           gap: '12px', 
           alignItems: 'flex-end'
@@ -271,7 +453,7 @@ export default function Chat({ currentUser }) {
           <input 
             value={text} 
             onChange={e=>setText(e.target.value)} 
-            placeholder="💭 Type a message..." 
+            placeholder={quotedMessage ? "💭 Reply to message..." : "💭 Type a message..."} 
             disabled={sending}
             style={{ 
               flex: 1, 
@@ -294,7 +476,7 @@ export default function Chat({ currentUser }) {
               opacity: sending ? 0.6 : 1
             }}
           >
-            {sending ? '⏳' : '✈️'} Send
+            {sending ? '⏳' : quotedMessage ? '↩️' : '✈️'} Send
           </button>
         </form>
       </div>

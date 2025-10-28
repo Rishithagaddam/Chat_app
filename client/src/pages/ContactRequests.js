@@ -1,100 +1,93 @@
 import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchRequests, acceptRequest, rejectRequest, fetchContacts } from '../features/contacts/contactsSlice';
+import { fetchRequests, acceptRequest, rejectRequest } from '../features/contacts/contactsSlice';
+import { useNavigate } from 'react-router-dom';
 
 export default function ContactRequests() {
   const dispatch = useDispatch();
-  const { requestsReceived, requestsSent, error } = useSelector(s => s.contacts);
+  const navigate = useNavigate();
+  const { requestsReceived, loading } = useSelector(s => s.contacts);
 
   useEffect(() => {
     dispatch(fetchRequests());
   }, [dispatch]);
 
-  const handleAccept = async (fromId) => {
-    await dispatch(acceptRequest(fromId));
-    // refresh contacts and requests
-    dispatch(fetchContacts());
-    dispatch(fetchRequests());
+  const handleAccept = (id) => {
+    dispatch(acceptRequest(id));
   };
 
-  const handleReject = async (fromId) => {
-    await dispatch(rejectRequest(fromId));
-    dispatch(fetchRequests());
+  const handleReject = (id) => {
+    dispatch(rejectRequest(id));
   };
 
   return (
     <div className="fade-in">
       <div className="card">
-        <h2>📩 Contact Requests</h2>
-        <p className="text-light">Manage your incoming and outgoing connection requests</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h2>📩 Contact Requests ({requestsReceived.length})</h2>
+            <p className="text-light">People who want to connect with you</p>
+          </div>
+          <button
+            onClick={() => navigate(-1)}
+            style={{
+              padding: '10px 20px',
+              background: 'var(--accent-light)',
+              color: 'var(--primary-medium)',
+              borderRadius: '10px',
+              border: 'none',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease'
+            }}
+          >
+            ← Back
+          </button>
+        </div>
       </div>
       
-      {error && <div className="error">{error}</div>}
+      {loading && <div className="loading">Loading requests...</div>}
       
-      <div className="card">
-        <h3 style={{ color: 'var(--primary-dark)', marginBottom: '20px' }}>📨 Incoming Requests</h3>
-        {requestsReceived.length === 0 ? (
-          <p className="text-light" style={{ textAlign: 'center', padding: '20px' }}>No incoming requests</p>
-        ) : (
-          <div className="contact-list">
-            {requestsReceived.map(u => (
-              <div key={u._id || u} className="contact-item" style={{ 
-                border: '2px solid var(--primary-light)', 
-                background: 'linear-gradient(135deg, var(--white), var(--accent-light))' 
-              }}>
-                <h3>{u.name || u.email || u}</h3>
-                <p>Wants to connect with you</p>
-                <div style={{ marginTop: '15px', display: 'flex', gap: '10px' }}>
-                  <button 
-                    onClick={() => handleAccept(u._id || u)}
-                    style={{
-                      background: '#00b894',
-                      color: 'white',
-                      border: 'none',
-                      padding: '8px 16px',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontWeight: '600'
-                    }}
-                  >
-                    ✅ Accept
-                  </button>
-                  <button 
-                    onClick={() => handleReject(u._id || u)}
-                    style={{
-                      background: '#d63031',
-                      color: 'white',
-                      border: 'none',
-                      padding: '8px 16px',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontWeight: '600'
-                    }}
-                  >
-                    ❌ Reject
-                  </button>
-                </div>
+      {requestsReceived.length === 0 ? (
+        <div className="card text-center">
+          <h3 style={{ color: 'var(--text-light)', marginBottom: '20px' }}>No pending requests</h3>
+          <p className="text-light">You're all caught up! 🎉</p>
+        </div>
+      ) : (
+        <div className="request-list">
+          {requestsReceived.map(req => (
+            <div key={req._id} className="request-item slide-in">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <h3>
+                  {req.from?.name || 'Unknown User'}
+                  {req.from?.isOnline ? (
+                    <span style={{ color: '#00b894', fontSize: '12px', marginLeft: '8px' }}>● Online</span>
+                  ) : (
+                    <span style={{ color: '#636e72', fontSize: '12px', marginLeft: '8px' }}>● Offline</span>
+                  )}
+                </h3>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="card">
-        <h3 style={{ color: 'var(--primary-dark)', marginBottom: '20px' }}>📤 Sent Requests</h3>
-        {requestsSent.length === 0 ? (
-          <p className="text-light" style={{ textAlign: 'center', padding: '20px' }}>No sent requests</p>
-        ) : (
-          <div className="contact-list">
-            {requestsSent.map(u => (
-              <div key={u._id || u} className="contact-item" style={{ opacity: 0.8 }}>
-                <h3>{u.name || u.email || u}</h3>
-                <p style={{ color: 'var(--text-light)' }}>⏳ Waiting for response...</p>
+              <p>Email: {req.from?.email || 'Not provided'}</p>
+              {!req.from?.isOnline && req.from?.lastSeen && (
+                <p style={{ fontSize: '12px', color: 'var(--text-light)' }}>
+                  Last seen: {new Date(req.from.lastSeen).toLocaleString()}
+                </p>
+              )}
+              <p style={{ fontSize: '12px', color: 'var(--text-light)' }}>
+                Requested: {new Date(req.createdAt).toLocaleString()}
+              </p>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
+                <button onClick={() => handleAccept(req._id)} style={{ background: 'var(--success-color)' }}>
+                  ✅ Accept
+                </button>
+                <button onClick={() => handleReject(req._id)} style={{ background: 'var(--error-color)' }}>
+                  ❌ Reject
+                </button>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

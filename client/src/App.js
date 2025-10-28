@@ -46,13 +46,21 @@ function App() {
         
         // Handle real-time online/offline status updates
         s.on('userOnline', (data) => {
-          // Refresh contacts to update online status
+          console.log('🟢 User came online:', data.user.name);
+          // Refresh contacts and users to update online status
           dispatch(fetchContacts());
         });
         
         s.on('userOffline', (data) => {
-          // Refresh contacts to update offline status  
+          console.log('🔴 User went offline:', data.user.name);
+          // Refresh contacts and users to update offline status
           dispatch(fetchContacts());
+        });
+
+        // Handle list of online users on connect
+        s.on('onlineUsers', (users) => {
+          console.log('📋 Received online users list:', users.length);
+          // This can be used to update the UI with current online users
         });
       }
     } else {
@@ -65,6 +73,7 @@ function App() {
         s.off('contactAccepted');
         s.off('userOnline');
         s.off('userOffline');
+        s.off('onlineUsers');
       }
       disconnectSocket();
     };

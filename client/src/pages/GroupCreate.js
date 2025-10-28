@@ -60,8 +60,27 @@ export default function GroupCreate({ currentUser }) {
   return (
     <div className="fade-in">
       <div className="card">
-        <h2>✨ Create New Group</h2>
-        <p className="text-light">Bring people together for group conversations</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h2>✨ Create New Group</h2>
+            <p className="text-light">Bring people together for group conversations</p>
+          </div>
+          <button
+            onClick={() => navigate('/groups')}
+            style={{
+              padding: '10px 20px',
+              background: 'var(--accent-light)',
+              color: 'var(--primary-medium)',
+              borderRadius: '10px',
+              border: 'none',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease'
+            }}
+          >
+            ← Back to Groups
+          </button>
+        </div>
       </div>
       
       {err && <div className="error">{err}</div>}

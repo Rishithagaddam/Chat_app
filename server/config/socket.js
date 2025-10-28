@@ -36,18 +36,23 @@ const handleConnection = (io) => {
     const userId = socket.userId;
     console.log(`User ${socket.user.name} connected with socket ID: ${socket.id}`);
 
-    // Store user's socket ID
+    // Store user's socket ID and update active status
+    const existingUser = activeUsers.get(userId);
     activeUsers.set(userId, {
       socketId: socket.id,
-      user: socket.user
+      user: socket.user,
+      connectedAt: new Date(),
+      lastActivity: new Date()
     });
 
-    // Update user's online status
+    // Update user's online status in database
     try {
       await User.findByIdAndUpdate(userId, { 
         isOnline: true,
         lastSeen: new Date()
       });
+      
+      console.log(`✅ User ${socket.user.name} marked as online`);
     } catch (error) {
       console.error('Error updating user online status:', error);
     }
@@ -55,8 +60,13 @@ const handleConnection = (io) => {
     // Broadcast user's online status to all connected users
     socket.broadcast.emit('userOnline', {
       userId,
-      user: socket.user,
-      isOnline: true
+      user: {
+        _id: socket.user._id,
+        name: socket.user.name,
+        email: socket.user.email,
+        isOnline: true,
+        lastSeen: new Date()
+      }
     });
 
     // Send list of online users to the newly connected user
@@ -67,11 +77,30 @@ const handleConnection = (io) => {
         name: user.name,
         email: user.email,
         phoneNumber: user.phoneNumber,
-        isOnline: true
+        isOnline: true,
+        lastSeen: new Date()
       }
     }));
 
     socket.emit('onlineUsers', onlineUsersList);
+
+    // Handle user activity tracking
+    socket.on('userActivity', async () => {
+      const userInfo = activeUsers.get(userId);
+      if (userInfo) {
+        userInfo.lastActivity = new Date();
+        activeUsers.set(userId, userInfo);
+        
+        // Update last seen in database periodically
+        try {
+          await User.findByIdAndUpdate(userId, { 
+            lastSeen: new Date() 
+          });
+        } catch (error) {
+          console.error('Error updating user activity:', error);
+        }
+      }
+    });
 
     // Handle joining a room (conversation)
     socket.on('joinRoom', (roomId) => {
@@ -342,28 +371,34 @@ const handleConnection = (io) => {
     });
 
     // Handle disconnection
-    socket.on('disconnect', async () => {
-      console.log(`User ${socket.user.name} disconnected`);
+    socket.on('disconnect', async (reason) => {
+      console.log(`User ${socket.user.name} disconnected. Reason: ${reason}`);
       
       // Remove user from active users
       activeUsers.delete(userId);
 
-      // Update user's offline status
+      // Update user's offline status and last seen
       try {
         await User.findByIdAndUpdate(userId, {
           isOnline: false,
           lastSeen: new Date()
         });
+        
+        console.log(`❌ User ${socket.user.name} marked as offline`);
       } catch (error) {
         console.error('Error updating user offline status:', error);
       }
 
-      // Broadcast user's offline status
+      // Broadcast user's offline status with updated lastSeen
       socket.broadcast.emit('userOffline', {
         userId,
-        user: socket.user,
-        isOnline: false,
-        lastSeen: new Date()
+        user: {
+          _id: socket.user._id,
+          name: socket.user.name,
+          email: socket.user.email,
+          isOnline: false,
+          lastSeen: new Date()
+        }
       });
     });
 
@@ -372,6 +407,41 @@ const handleConnection = (io) => {
       console.error('Socket error:', error);
     });
   });
+
+  // Periodic cleanup for inactive users
+  setInterval(async () => {
+    const now = new Date();
+    const inactiveThreshold = 5 * 60 * 1000; // 5 minutes
+
+    for (const [userId, userInfo] of activeUsers.entries()) {
+      if (now - userInfo.lastActivity > inactiveThreshold) {
+        console.log(`🔄 Marking inactive user ${userInfo.user.name} as offline`);
+        
+        try {
+          await User.findByIdAndUpdate(userId, {
+            isOnline: false,
+            lastSeen: userInfo.lastActivity
+          });
+          
+          // Broadcast offline status
+          io.emit('userOffline', {
+            userId,
+            user: {
+              _id: userInfo.user._id,
+              name: userInfo.user.name,
+              email: userInfo.user.email,
+              isOnline: false,
+              lastSeen: userInfo.lastActivity
+            }
+          });
+          
+          activeUsers.delete(userId);
+        } catch (error) {
+          console.error('Error updating inactive user status:', error);
+        }
+      }
+    }
+  }, 60000); // Check every minute
 };
 
 module.exports = { handleConnection, activeUsers };

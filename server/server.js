@@ -10,15 +10,14 @@ const { handleConnection } = require('./config/socket');
 const authMiddleware = require('./middleware/authMiddleware');
 
 // Import routes
-console.log('Loading auth routes...');
 const authRoutes = require('./routes/auth');
-console.log('Loading user routes...');
 const userRoutes = require('./routes/users');
-console.log('Loading message routes...');
+const contactRoutes = require('./routes/contacts');
 const messageRoutes = require('./routes/messages');
-console.log('Loading group routes...');
 const groupRoutes = require('./routes/groups');
-console.log('All routes loaded successfully!');
+const pollRoutes = require('./routes/polls');
+const announcementRoutes = require('./routes/announcements');
+const mediaRoutes = require('./routes/media');
 
 // Load environment variables
 dotenv.config();
@@ -119,15 +118,12 @@ app.use('/uploads', express.static('uploads'));
 console.log('Registering API routes...');
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/contacts', contactRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/groups', groupRoutes);
-const contactsRoutes = require('./routes/contacts');
-app.use('/api/contacts', contactsRoutes);
-const mediaRoutes = require('./routes/media');
+app.use('/api/polls', pollRoutes);
+app.use('/api/announcements', announcementRoutes);
 app.use('/api/media', mediaRoutes);
-// Add voice message route
-const voiceRoutes = require('./routes/voice');
-app.use('/api/voice', voiceRoutes);
 console.log('✅ API routes registered');
 
 // Handle Socket.IO connections
