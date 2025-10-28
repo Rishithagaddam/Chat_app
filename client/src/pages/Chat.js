@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import api from '../api';
-import { useParams } from 'react-router-dom';
+import { useParams, Navigate } from 'react-router-dom';
 import { getSocket } from '../socket';
 import MediaUpload from '../components/MediaUpload';
 import MediaMessages from '../components/MediaMessages';
+import { useSelector } from 'react-redux';
 
 export default function Chat({ currentUser }) {
   const { id: otherId } = useParams();
@@ -13,6 +14,8 @@ export default function Chat({ currentUser }) {
   const [sending, setSending] = useState(false);
   const socket = getSocket();
   const endRef = useRef(null);
+  
+  const { contacts } = useSelector(state => state.contacts);
 
   useEffect(() => {
     (async () => {
@@ -189,6 +192,14 @@ export default function Chat({ currentUser }) {
     }
   };
 
+  const isContact = contacts?.some(contact => 
+    (contact._id || contact).toString() === otherId.toString()
+  );
+
+  if (!isContact) {
+    return <Navigate to="/users" replace />;
+  }
+  
   return (
     <div className="fade-in">
       <div className="card">

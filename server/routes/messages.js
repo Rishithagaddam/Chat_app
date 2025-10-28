@@ -30,6 +30,15 @@ router.get('/:userId', authMiddleware, async (req, res) => {
       });
     }
 
+    // Check if users are contacts
+    const currentUser = await User.findById(currentUserId);
+    if (!currentUser.contacts.includes(userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only chat with users in your contacts'
+      });
+    }
+
     // Get messages between current user and the specified user
     const messages = await Message.find({
       $or: [

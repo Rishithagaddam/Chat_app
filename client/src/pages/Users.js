@@ -65,18 +65,20 @@ export default function Users() {
                 </p>
               )}
               <div style={{ marginTop: '12px' }}>
-                <Link to={`/chat/${u._id}`} style={{ 
-                  display: 'inline-block', 
-                  padding: '8px 16px', 
-                  background: 'var(--accent-light)', 
-                  borderRadius: '8px',
-                  color: 'var(--primary-medium)',
-                  textDecoration: 'none',
-                  fontSize: '14px',
-                  fontWeight: '600'
-                }}>
-                  💬 Start Chat
-                </Link>
+                {contactIds.has(u._id.toString()) && (
+                  <Link to={`/chat/${u._id}`} style={{ 
+                    display: 'inline-block', 
+                    padding: '8px 16px', 
+                    background: 'var(--accent-light)', 
+                    borderRadius: '8px',
+                    color: 'var(--primary-medium)',
+                    textDecoration: 'none',
+                    fontSize: '14px',
+                    fontWeight: '600'
+                  }}>
+                    💬 Start Chat
+                  </Link>
+                )}
               </div>
             </div>
           ))}
