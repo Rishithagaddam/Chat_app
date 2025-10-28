@@ -46,6 +46,15 @@ export const rejectRequest = createAsyncThunk('contacts/rejectRequest', async (f
   }
 });
 
+export const withdrawRequest = createAsyncThunk('contacts/withdrawRequest', async (toUserId, { rejectWithValue }) => {
+  try {
+    const res = await api.post('/contacts/reject-request', { fromUserId: toUserId });
+    return { toUserId, message: res.data.message };
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.message || err.message);
+  }
+});
+
 export const fetchContacts = createAsyncThunk('contacts/fetchContacts', async (_, { rejectWithValue }) => {
   try {
     const res = await api.get('/contacts');
@@ -82,8 +91,8 @@ const contactsSlice = createSlice({
       .addCase(fetchRequests.fulfilled, (state, action) => {
         // requestsReceived: populated user objects
         state.requestsReceived = action.payload.requestsReceived || [];
-        // requestsSent: convert to id strings for quick includes checks
-        state.requestsSent = (action.payload.requestsSent || []).map(u => u._id ? u._id.toString() : u.toString());
+        // requestsSent: keep as populated user objects for display
+        state.requestsSent = action.payload.requestsSent || [];
       })
       .addCase(fetchRequests.rejected, (state, action) => { state.error = action.payload; })
 
@@ -101,6 +110,12 @@ const contactsSlice = createSlice({
         state.requestsReceived = state.requestsReceived.filter(u => (u._id?.toString() || u.toString()) !== id);
       })
       .addCase(rejectRequest.rejected, (state, action) => { state.error = action.payload; })
+
+      .addCase(withdrawRequest.fulfilled, (state, action) => {
+        const id = action.payload.toUserId;
+        state.requestsSent = state.requestsSent.filter(u => (u._id?.toString() || u.toString()) !== id);
+      })
+      .addCase(withdrawRequest.rejected, (state, action) => { state.error = action.payload; })
 
       .addCase(fetchContacts.fulfilled, (state, action) => {
         state.contacts = action.payload;

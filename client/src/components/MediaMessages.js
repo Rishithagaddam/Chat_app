@@ -606,6 +606,29 @@ export const FileMessage = ({ message, isOwn }) => {
 // Main MediaMessages component that renders the appropriate message type
 const MediaMessages = ({ message, isSent, senderName }) => {
   const messageType = message.messageType || 'text';
+  
+  // Extract required variables from message object
+  const fileUrl = message.fileUrl || '';
+  const fileName = message.fileName || 'Unknown file';
+  const fileSize = message.fileSize || 0;
+  const mimeType = message.mimeType || '';
+  const duration = message.duration || 0;
+  const baseUrl = 'http://localhost:5000';
+
+  // Utility functions
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const formatDuration = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   switch (messageType) {
     case 'image':
