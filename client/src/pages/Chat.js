@@ -2,12 +2,15 @@ import React, { useEffect, useState, useRef } from 'react';
 import api from '../api';
 import { useParams } from 'react-router-dom';
 import { getSocket } from '../socket';
+import MediaUpload from '../components/MediaUpload';
+import MediaMessages from '../components/MediaMessages';
 
 export default function Chat({ currentUser }) {
   const { id: otherId } = useParams();
   const [messages, setMessages] = useState([]);
   const [other, setOther] = useState(null);
   const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
   const socket = getSocket();
   const endRef = useRef(null);
 
@@ -32,47 +35,54 @@ export default function Chat({ currentUser }) {
 
     const dedupeExists = (msg, prev) => {
       if (!msg) return false;
+      // Skip temp messages for deduplication
+      if (msg._id && msg._id.startsWith('temp-')) return false;
       if (msg._id) return prev.some(m => String(m._id) === String(msg._id));
-      // fallback: match by exact text + timestamp (best-effort)
-      return prev.some(m => m.message === msg.message && String(m.sender?._id || m.sender) === String(msg.sender?._id || msg.sender));
+      // Fallback: match by exact content + sender + timestamp (within 5 seconds)
+      return prev.some(m => 
+        m.message === msg.message && 
+        String(m.sender?._id || m.sender) === String(msg.sender?._id || msg.sender) &&
+        Math.abs(new Date(m.createdAt) - new Date(msg.createdAt)) < 5000
+      );
     };
 
     const handleReceiveMessage = (data) => {
       const msg = data.message || data;
       if (!msg) return;
-      if (!([String(msg.sender?._id || msg.sender), String(msg.receiver?._id || msg.receiver)].includes(String(otherId)))) return;
+      
+      // Only handle messages for this conversation
+      const participants = [String(msg.sender?._id || msg.sender), String(msg.receiver?._id || msg.receiver)];
+      if (!participants.includes(String(otherId))) return;
+      
       setMessages(prev => {
         if (dedupeExists(msg, prev)) return prev;
         return [...prev, msg];
       });
     };
 
-    const handleNewMessage = ({ message }) => {
-      const msg = message || {};
-      if (!([String(msg.sender?._id || msg.sender), String(msg.receiver?._id || msg.receiver)].includes(String(otherId)))) return;
-      setMessages(prev => {
-        if (dedupeExists(msg, prev)) return prev;
-        return [...prev, msg];
-      });
-    };
-
-    // server confirms saved message for sender
+    // Server confirms saved message for sender
     const handleMessageDelivered = (payload) => {
       const msg = payload.message || payload.data || payload;
       if (!msg) return;
-      // only handle if part of this conversation
+      
+      // Only handle if part of this conversation
       const senderId = String(msg.sender?._id || msg.sender);
       const receiverId = String(msg.receiver?._id || msg.receiver);
       if (![senderId, receiverId].includes(String(otherId))) return;
 
       setMessages(prev => {
-        // Remove matching pending temp messages (match by pending flag + identical text + sender)
+        // Remove matching pending temp messages
         const filtered = prev.filter(m => {
-          if (m.pending && m.message === msg.message) {
+          if (m.pending) {
             const mSender = String(m.sender?._id || m.sender);
             const curSender = String(currentUser?.id || currentUser?._id);
-            // remove only pending messages created by this client
-            if (mSender === curSender) return false; // drop this temp
+            // Remove temp messages from this client that match content
+            if (mSender === curSender && (
+              m.message === msg.message || 
+              (m.fileUrl && m.fileUrl === msg.fileUrl)
+            )) {
+              return false; // remove this temp message
+            }
           }
           return true;
         });
@@ -85,12 +95,13 @@ export default function Chat({ currentUser }) {
     };
 
     socket.on('receiveMessage', handleReceiveMessage);
-    socket.on('newMessage', handleNewMessage);
     socket.on('messageDelivered', handleMessageDelivered);
+
+    // Remove newMessage handler as it causes duplicates
+    // socket.on('newMessage', handleNewMessage);
 
     return () => {
       socket.off('receiveMessage', handleReceiveMessage);
-      socket.off('newMessage', handleNewMessage);
       socket.off('messageDelivered', handleMessageDelivered);
       // leave the conversation room
       try {
@@ -104,7 +115,9 @@ export default function Chat({ currentUser }) {
 
   const send = async (e) => {
     e.preventDefault();
-    if (!text.trim()) return;
+    if (!text.trim() || sending) return;
+    
+    setSending(true);
     try {
       // Use socket if available
       if (socket) {
@@ -127,7 +140,53 @@ export default function Chat({ currentUser }) {
         setMessages(res.data.messages || []);
       }
       setText('');
-    } catch (err) { /* ignore */ }
+    } catch (err) { 
+      console.error('Failed to send message:', err);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleMediaSend = (mediaMessage) => {
+    console.log('📤 Media message received:', mediaMessage);
+    
+    if (socket) {
+      // Create optimistic temp message for immediate UI feedback
+      const tempMsg = {
+        _id: `temp-${Date.now()}`,
+        sender: { _id: currentUser.id || currentUser._id, name: currentUser.name },
+        receiver: { _id: otherId },
+        message: mediaMessage.message || '',
+        messageType: mediaMessage.messageType,
+        fileUrl: mediaMessage.fileUrl,
+        fileName: mediaMessage.fileName,
+        fileSize: mediaMessage.fileSize,
+        mimeType: mediaMessage.mimeType,
+        duration: mediaMessage.duration,
+        dimensions: mediaMessage.dimensions,
+        createdAt: new Date().toISOString(),
+        pending: true
+      };
+      
+      // Add temp message to UI
+      setMessages(prev => [...prev, tempMsg]);
+      
+      // Emit to socket (will be replaced by server response)
+      socket.emit('sendMessage', {
+        receiverId: otherId,
+        message: mediaMessage.message || '',
+        messageType: mediaMessage.messageType,
+        fileUrl: mediaMessage.fileUrl,
+        fileName: mediaMessage.fileName,
+        fileSize: mediaMessage.fileSize,
+        mimeType: mediaMessage.mimeType,
+        duration: mediaMessage.duration,
+        dimensions: mediaMessage.dimensions
+      });
+    } else {
+      // Fallback: add to local state only if no socket
+      setMessages(prev => [...prev, mediaMessage]);
+    }
   };
 
   return (
@@ -147,9 +206,20 @@ export default function Chat({ currentUser }) {
           messages.map(m => {
             const senderId = String(m.sender?._id || m.sender);
             const mine = senderId === String(currentUser.id || currentUser._id);
+            
             return (
               <div key={m._id} className={mine ? 'msg me' : 'msg'} style={{ animationDelay: '0.1s' }}>
-                <div className="msg-text">{m.message}</div>
+                {/* Render different message types */}
+                {m.messageType === 'text' || !m.messageType ? (
+                  <div className="msg-text">{m.message}</div>
+                ) : (
+                  <MediaMessages 
+                    message={m} 
+                    isSent={mine}
+                    senderName={m.sender?.name || 'Unknown'}
+                  />
+                )}
+                
                 <div className="msg-meta">
                   {new Date(m.createdAt || m.updatedAt || Date.now()).toLocaleTimeString([], { 
                     hour: '2-digit', 
@@ -164,43 +234,59 @@ export default function Chat({ currentUser }) {
         <div ref={endRef} />
       </div>
       
-      <form onSubmit={send} style={{ 
-        display: 'flex', 
-        gap: '12px', 
-        alignItems: 'flex-end',
+      <div style={{
         background: 'var(--white)',
         padding: '20px',
         borderRadius: '16px',
         boxShadow: '0 8px 32px var(--shadow)',
-        border: '1px solid var(--border-color)' 
+        border: '1px solid var(--border-color)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '16px'
       }}>
-        <input 
-          value={text} 
-          onChange={e=>setText(e.target.value)} 
-          placeholder="💭 Type a message..." 
-          style={{ 
-            flex: 1, 
-            margin: 0,
-            borderRadius: '12px',
-            fontSize: '16px'
-          }}
+        {/* Media Upload Buttons */}
+        <MediaUpload 
+          onSend={handleMediaSend}
+          disabled={sending}
+          receiverId={otherId}
         />
-        <button 
-          type="submit" 
-          disabled={!text.trim()}
-          style={{ 
-            margin: 0,
-            minWidth: '80px',
-            borderRadius: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px'
-          }}
-        >
-          ✈️ Send
-        </button>
-      </form>
+        
+        {/* Text Message Form */}
+        <form onSubmit={send} style={{ 
+          display: 'flex', 
+          gap: '12px', 
+          alignItems: 'flex-end'
+        }}>
+          <input 
+            value={text} 
+            onChange={e=>setText(e.target.value)} 
+            placeholder="💭 Type a message..." 
+            disabled={sending}
+            style={{ 
+              flex: 1, 
+              margin: 0,
+              borderRadius: '12px',
+              fontSize: '16px'
+            }}
+          />
+          <button 
+            type="submit" 
+            disabled={!text.trim() || sending}
+            style={{ 
+              margin: 0,
+              minWidth: '80px',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              opacity: sending ? 0.6 : 1
+            }}
+          >
+            {sending ? '⏳' : '✈️'} Send
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

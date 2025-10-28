@@ -49,8 +49,10 @@ router.get('/:userId', authMiddleware, async (req, res) => {
         isRead: false
       },
       {
-        isRead: true,
-        readAt: new Date()
+        $set: {
+          isRead: true,
+          readAt: new Date()
+        }
       }
     );
 
@@ -82,14 +84,40 @@ router.get('/:userId', authMiddleware, async (req, res) => {
 // @access  Private
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { receiverId, message, messageType = 'text' } = req.body;
+    const { 
+      receiverId, 
+      message, 
+      messageType = 'text',
+      fileUrl,
+      fileName,
+      fileSize,
+      mimeType,
+      duration,
+      dimensions
+    } = req.body;
     const senderId = req.user._id;
 
     // Validation
-    if (!receiverId || !message) {
+    if (!receiverId) {
       return res.status(400).json({
         success: false,
-        message: 'Receiver ID and message are required'
+        message: 'Receiver ID is required'
+      });
+    }
+
+    // For text messages, message is required
+    // For media messages, fileUrl is required
+    if (messageType === 'text' && !message) {
+      return res.status(400).json({
+        success: false,
+        message: 'Message content is required for text messages'
+      });
+    }
+
+    if (['image', 'audio', 'video', 'file', 'voice'].includes(messageType) && !fileUrl) {
+      return res.status(400).json({
+        success: false,
+        message: 'File URL is required for media messages'
       });
     }
 
@@ -109,18 +137,41 @@ router.post('/', authMiddleware, async (req, res) => {
       });
     }
 
-    // Create new message
-    const newMessage = await Message.create({
+    // Create message data
+    const messageData = {
       sender: senderId,
       receiver: receiverId,
-      message: message.trim(),
+      message: message ? message.trim() : '',
       messageType
-    });
+    };
+
+    // Add media-specific fields
+    if (fileUrl) messageData.fileUrl = fileUrl;
+    if (fileName) messageData.fileName = fileName;
+    if (fileSize) messageData.fileSize = fileSize;
+    if (mimeType) messageData.mimeType = mimeType;
+    if (duration) messageData.duration = duration;
+    if (dimensions) messageData.dimensions = dimensions;
+
+    // Create new message
+    const newMessage = await Message.create(messageData);
 
     // Populate sender and receiver information
     const populatedMessage = await Message.findById(newMessage._id)
       .populate('sender', 'name email phoneNumber isOnline')
       .populate('receiver', 'name email phoneNumber isOnline');
+
+    // Emit real-time event if socket.io is available
+    const io = req.app.get('socketio');
+    if (io) {
+      const { activeUsers } = require('../config/socket');
+      const receiverSocket = activeUsers.get(receiverId);
+      if (receiverSocket) {
+        io.to(receiverSocket.socketId).emit('receiveMessage', {
+          message: populatedMessage
+        });
+      }
+    }
 
     res.status(201).json({
       success: true,

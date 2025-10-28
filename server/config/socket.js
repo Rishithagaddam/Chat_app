@@ -88,61 +88,89 @@ const handleConnection = (io) => {
     // Handle sending messages
     socket.on('sendMessage', async (data) => {
       try {
-        const { receiverId, message, messageType = 'text' } = data;
+        const { 
+          receiverId, 
+          message, 
+          messageType = 'text',
+          fileUrl,
+          fileName,
+          fileSize,
+          mimeType,
+          duration,
+          dimensions
+        } = data;
 
-        // Validation
-        if (!receiverId || !message) {
-          socket.emit('messageError', {
-            error: 'Receiver ID and message are required'
-          });
+        // Enhanced validation
+        if (!receiverId) {
+          socket.emit('messageError', { error: 'Receiver ID is required' });
+          return;
+        }
+
+        // For text messages, message is required
+        // For media messages, fileUrl is required
+        if (messageType === 'text' && !message?.trim()) {
+          socket.emit('messageError', { error: 'Message content is required for text messages' });
+          return;
+        }
+
+        if (['image', 'audio', 'video', 'file', 'voice'].includes(messageType) && !fileUrl) {
+          socket.emit('messageError', { error: 'File URL is required for media messages' });
           return;
         }
 
         // Check if receiver exists
         const receiver = await User.findById(receiverId);
         if (!receiver) {
-          socket.emit('messageError', {
-            error: 'Receiver not found'
-          });
+          socket.emit('messageError', { error: 'Receiver not found' });
           return;
         }
 
-        // Save message to database
-        const newMessage = await Message.create({
+        // Prepare message data
+        const messageData = {
           sender: userId,
           receiver: receiverId,
-          message: message.trim(),
+          message: message ? message.trim() : '',
           messageType
-        });
+        };
+
+        // Add media fields if present
+        if (fileUrl) messageData.fileUrl = fileUrl;
+        if (fileName) messageData.fileName = fileName;
+        if (fileSize) messageData.fileSize = fileSize;
+        if (mimeType) messageData.mimeType = mimeType;
+        if (duration) messageData.duration = duration;
+        if (dimensions) messageData.dimensions = dimensions;
+
+        // Save message to database
+        const newMessage = await Message.create(messageData);
 
         // Populate sender and receiver information
         const populatedMessage = await Message.findById(newMessage._id)
           .populate('sender', 'name email phoneNumber isOnline')
           .populate('receiver', 'name email phoneNumber isOnline');
 
-        // Send message to sender (confirmation)
+        // Send confirmation to sender ONLY
         socket.emit('messageDelivered', {
           success: true,
           message: populatedMessage
         });
 
-        // Send message to receiver if they are online
+        // Send message to receiver if they are online ONLY
         const receiverSocket = activeUsers.get(receiverId);
         if (receiverSocket) {
           io.to(receiverSocket.socketId).emit('receiveMessage', {
             message: populatedMessage
           });
+          
+          // Mark as delivered
+          await Message.findByIdAndUpdate(newMessage._id, {
+            $addToSet: {
+              deliveredTo: { user: receiverId, deliveredAt: new Date() }
+            }
+          });
         }
 
-        // Create room ID for this conversation (consistent ordering)
-        const roomId = [userId, receiverId].sort().join('_');
-        
-        // Broadcast to room (for multiple devices/tabs)
-        socket.to(roomId).emit('newMessage', {
-          message: populatedMessage
-        });
-
-        console.log(`Message sent from ${socket.user.name} to ${receiver.name}`);
+        console.log(`Message sent from ${socket.user.name} to ${receiver.name} (${messageType})`);
       } catch (error) {
         console.error('Error handling sendMessage:', error);
         socket.emit('messageError', {
@@ -214,12 +242,22 @@ const handleConnection = (io) => {
     // Handle sending group messages
     socket.on('sendGroupMessage', async (data) => {
       try {
-        const { groupId, message, messageType = 'text' } = data;
+        const { 
+          groupId, 
+          message, 
+          messageType = 'text',
+          fileUrl,
+          fileName,
+          fileSize,
+          mimeType,
+          duration,
+          dimensions
+        } = data;
 
         // Validation
-        if (!groupId || !message) {
+        if (!groupId || (!message && !fileUrl)) {
           socket.emit('messageError', {
-            error: 'Group ID and message are required'
+            error: 'Group ID and message content are required'
           });
           return;
         }
@@ -235,15 +273,26 @@ const handleConnection = (io) => {
           return;
         }
 
-        // Create and save message
-        const Message = require('../models/Message');
-        const newMessage = new Message({
+        // Prepare message data
+        const messageData = {
           sender: userId,
           group: groupId,
-          message: message.trim(),
+          message: message ? message.trim() : '',
           messageType,
           isRead: [{ user: userId }] // Mark as read by sender
-        });
+        };
+
+        // Add media fields if present
+        if (fileUrl) messageData.fileUrl = fileUrl;
+        if (fileName) messageData.fileName = fileName;
+        if (fileSize) messageData.fileSize = fileSize;
+        if (mimeType) messageData.mimeType = mimeType;
+        if (duration) messageData.duration = duration;
+        if (dimensions) messageData.dimensions = dimensions;
+
+        // Create and save message
+        const Message = require('../models/Message');
+        const newMessage = new Message(messageData);
 
         const savedMessage = await newMessage.save();
 

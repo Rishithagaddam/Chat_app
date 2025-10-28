@@ -112,6 +112,9 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Serve static files from uploads directory
+app.use('/uploads', express.static('uploads'));
+
 // API Routes
 console.log('Registering API routes...');
 app.use('/api/auth', authRoutes);
@@ -120,6 +123,11 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/groups', groupRoutes);
 const contactsRoutes = require('./routes/contacts');
 app.use('/api/contacts', contactsRoutes);
+const mediaRoutes = require('./routes/media');
+app.use('/api/media', mediaRoutes);
+// Add voice message route
+const voiceRoutes = require('./routes/voice');
+app.use('/api/voice', voiceRoutes);
 console.log('✅ API routes registered');
 
 // Handle Socket.IO connections

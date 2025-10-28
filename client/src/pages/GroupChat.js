@@ -36,16 +36,29 @@ export default function GroupChat({ currentUser }) {
 
     const dedupeExists = (msg, prev) => {
       if (!msg) return false;
+      if (msg._id && msg._id.startsWith('temp-')) return false; // Don't dedupe temp messages
       if (msg._id) return prev.some(m => String(m._id) === String(msg._id));
-      return prev.some(m => m.message === msg.message && String(m.sender?._id || m.sender) === String(msg.sender?._id || msg.sender));
+      return prev.some(m => 
+        m.message === msg.message && 
+        String(m.sender?._id || m.sender) === String(msg.sender?._id || msg.sender) &&
+        Math.abs(new Date(m.createdAt) - new Date(msg.createdAt)) < 5000 // within 5 seconds
+      );
     };
 
     const handleReceive = (payload) => {
       if (payload?.groupId && String(payload.groupId) === String(groupId)) {
         const msg = payload.message || payload;
         setMessages(prev => {
-          // replace pending temp messages from this client that match text
-          const filtered = prev.filter(m => !(m.pending && m.message === msg.message && String(m.sender?._id || m.sender) === String(currentUser.id || currentUser._id)));
+          // Remove pending temp messages from this client that match
+          const filtered = prev.filter(m => {
+            if (m.pending && m.message === msg.message) {
+              const mSender = String(m.sender?._id || m.sender);
+              const curSender = String(currentUser.id || currentUser._id);
+              if (mSender === curSender) return false; // remove temp
+            }
+            return true;
+          });
+          
           if (dedupeExists(msg, filtered)) return filtered;
           return [...filtered, msg];
         });
