@@ -23,27 +23,78 @@ export default function ContactRequests() {
   };
 
   return (
-    <div>
-      <h2>Incoming requests</h2>
+    <div className="fade-in">
+      <div className="card">
+        <h2>📩 Contact Requests</h2>
+        <p className="text-light">Manage your incoming and outgoing connection requests</p>
+      </div>
+      
       {error && <div className="error">{error}</div>}
-      <ul>
-        {requestsReceived.length === 0 && <li>No incoming requests</li>}
-        {requestsReceived.map(u => (
-          <li key={u._id || u}>
-            {u.name || u.email || u}
-            <button onClick={() => handleAccept(u._id || u)} style={{ marginLeft: 8 }}>Accept</button>
-            <button onClick={() => handleReject(u._id || u)} style={{ marginLeft: 8 }}>Reject</button>
-          </li>
-        ))}
-      </ul>
+      
+      <div className="card">
+        <h3 style={{ color: 'var(--primary-dark)', marginBottom: '20px' }}>📨 Incoming Requests</h3>
+        {requestsReceived.length === 0 ? (
+          <p className="text-light" style={{ textAlign: 'center', padding: '20px' }}>No incoming requests</p>
+        ) : (
+          <div className="contact-list">
+            {requestsReceived.map(u => (
+              <div key={u._id || u} className="contact-item" style={{ 
+                border: '2px solid var(--primary-light)', 
+                background: 'linear-gradient(135deg, var(--white), var(--accent-light))' 
+              }}>
+                <h3>{u.name || u.email || u}</h3>
+                <p>Wants to connect with you</p>
+                <div style={{ marginTop: '15px', display: 'flex', gap: '10px' }}>
+                  <button 
+                    onClick={() => handleAccept(u._id || u)}
+                    style={{
+                      background: '#00b894',
+                      color: 'white',
+                      border: 'none',
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontWeight: '600'
+                    }}
+                  >
+                    ✅ Accept
+                  </button>
+                  <button 
+                    onClick={() => handleReject(u._id || u)}
+                    style={{
+                      background: '#d63031',
+                      color: 'white',
+                      border: 'none',
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontWeight: '600'
+                    }}
+                  >
+                    ❌ Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
-      <h3>Sent requests</h3>
-      <ul>
-        {requestsSent.length === 0 && <li>No sent requests</li>}
-        {requestsSent.map(u => (
-          <li key={u._id || u}>{u.name || u.email || u}</li>
-        ))}
-      </ul>
+      <div className="card">
+        <h3 style={{ color: 'var(--primary-dark)', marginBottom: '20px' }}>📤 Sent Requests</h3>
+        {requestsSent.length === 0 ? (
+          <p className="text-light" style={{ textAlign: 'center', padding: '20px' }}>No sent requests</p>
+        ) : (
+          <div className="contact-list">
+            {requestsSent.map(u => (
+              <div key={u._id || u} className="contact-item" style={{ opacity: 0.8 }}>
+                <h3>{u.name || u.email || u}</h3>
+                <p style={{ color: 'var(--text-light)' }}>⏳ Waiting for response...</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

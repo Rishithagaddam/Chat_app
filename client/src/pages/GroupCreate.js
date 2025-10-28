@@ -58,33 +58,111 @@ export default function GroupCreate({ currentUser }) {
   };
 
   return (
-    <div>
-      <h2>Create Group</h2>
+    <div className="fade-in">
+      <div className="card">
+        <h2>✨ Create New Group</h2>
+        <p className="text-light">Bring people together for group conversations</p>
+      </div>
+      
       {err && <div className="error">{err}</div>}
+      
       <form onSubmit={submit}>
-        <input placeholder="Group name" value={name} onChange={e=>setName(e.target.value)} />
-        <div style={{ marginTop: 12 }}>
-          <strong>Select members</strong>
-          <ul>
-            {users.map(u => (
-              <li key={u._id} style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                <label style={{ cursor: 'pointer' }}>
+        <div style={{ marginBottom: '30px' }}>
+          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: 'var(--primary-dark)' }}>
+            🏷️ Group Name
+          </label>
+          <input 
+            placeholder="Enter a fun group name..." 
+            value={name} 
+            onChange={e=>setName(e.target.value)}
+            style={{ fontSize: '18px' }}
+          />
+        </div>
+        
+        <div style={{ marginBottom: '30px' }}>
+          <label style={{ display: 'block', marginBottom: '16px', fontWeight: '600', color: 'var(--primary-dark)' }}>
+            👥 Select Members ({selected.size} selected)
+          </label>
+          
+          {users.length === 0 ? (
+            <div className="card text-center">
+              <p className="text-light">No contacts available. Add some contacts first!</p>
+            </div>
+          ) : (
+            <div style={{ 
+              maxHeight: '400px', 
+              overflowY: 'auto',
+              background: 'var(--white)',
+              border: '2px solid var(--border-color)',
+              borderRadius: '12px',
+              padding: '16px'
+            }}>
+              {users.map(u => (
+                <div 
+                  key={u._id} 
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    padding: '12px',
+                    marginBottom: '8px',
+                    borderRadius: '8px',
+                    background: selected.has(u._id) ? 'var(--accent-light)' : 'transparent',
+                    border: selected.has(u._id) ? '2px solid var(--primary-light)' : '2px solid transparent',
+                    transition: 'all 0.3s ease',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => toggle(u._id)}
+                >
                   <input
                     type="checkbox"
                     checked={selected.has(u._id)}
                     onChange={() => toggle(u._id)}
-                  />{' '}
-                  {u.name} {u.isOnline ? '(online)' : ''}
-                </label>
-              </li>
-            ))}
-          </ul>
+                    style={{ marginRight: '12px', cursor: 'pointer' }}
+                  />
+                  <div>
+                    <strong>{u.name}</strong>
+                    {u.isOnline && <span style={{ color: '#00b894', fontSize: '12px', marginLeft: '8px' }}>● Online</span>}
+                    <br/>
+                    <small className="text-light">{u.email}</small>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-        <div style={{ marginTop: 12 }}>
-          <button type="submit">Create Group</button>{' '}
-          <button type="button" onClick={()=>navigate('/groups')}>Cancel</button>
+        
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+          <button type="submit" disabled={!name.trim() || selected.size === 0}>
+            🚀 Create Group
+          </button>
+          <button type="button" onClick={()=>navigate('/groups')}>
+            ❌ Cancel
+          </button>
         </div>
       </form>
+      
+      {selected.size > 0 && (
+        <div className="card" style={{ marginTop: '20px', background: 'var(--accent-light)', border: '2px solid var(--primary-light)' }}>
+          <h4 style={{ color: 'var(--primary-dark)', marginBottom: '10px' }}>Selected Members:</h4>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {Array.from(selected).map(id => {
+              const user = users.find(u => u._id === id);
+              return user ? (
+                <span key={id} style={{ 
+                  background: 'var(--primary-medium)', 
+                  color: 'white', 
+                  padding: '4px 12px', 
+                  borderRadius: '16px', 
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}>
+                  {user.name}
+                </span>
+              ) : null;
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

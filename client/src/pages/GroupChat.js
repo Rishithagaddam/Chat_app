@@ -87,29 +87,127 @@ export default function GroupChat({ currentUser }) {
   };
 
   return (
-    <div>
-      <h2>Group: {group?.name || 'Group'}</h2>
-      <div style={{ marginBottom: 8 }}>
-        <Link to="/groups">← Back to groups</Link>
+    <div className="fade-in">
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h2>🎯 {group?.name || 'Group Chat'}</h2>
+            <p className="text-light">
+              👥 {group?.members?.length || group?.memberCount || 0} members • Group conversation
+            </p>
+          </div>
+          <Link to="/groups" style={{
+            padding: '10px 20px',
+            background: 'var(--accent-light)',
+            color: 'var(--primary-medium)',
+            borderRadius: '10px',
+            textDecoration: 'none',
+            fontWeight: '600',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            transition: 'all 0.3s ease'
+          }}>
+            ← Back to Groups
+          </Link>
+        </div>
       </div>
+      
       <div className="chat-window">
-        {messages.map(m => {
-          const senderId = String(m.sender?._id || m.sender);
-          const mine = senderId === String(currentUser.id || currentUser._id);
-          return (
-            <div key={m._id} className={mine ? 'msg me' : 'msg'}>
-              <div style={{ fontSize: 12, color: '#666' }}>{m.sender?.name || m.sender?.user?.name}</div>
-              <div className="msg-text">{m.message}</div>
-              <div className="msg-meta">{new Date(m.createdAt || Date.now()).toLocaleString()}{m.pending ? ' • sending…' : ''}</div>
-            </div>
-          );
-        })}
+        {messages.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-light)' }}>
+            <h3>🎉 Welcome to the group!</h3>
+            <p>Start the conversation by sending a message</p>
+          </div>
+        ) : (
+          messages.map(m => {
+            const senderId = String(m.sender?._id || m.sender);
+            const mine = senderId === String(currentUser.id || currentUser._id);
+            return (
+              <div key={m._id} className={mine ? 'msg me' : 'msg'}>
+                {!mine && (
+                  <div style={{ 
+                    fontSize: '12px', 
+                    fontWeight: '600',
+                    color: 'var(--primary-medium)', 
+                    marginBottom: '4px' 
+                  }}>
+                    👤 {m.sender?.name || m.sender?.user?.name || 'Unknown'}
+                  </div>
+                )}
+                <div className="msg-text">{m.message}</div>
+                <div className="msg-meta">
+                  {new Date(m.createdAt || Date.now()).toLocaleTimeString([], { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                  })}
+                  {m.pending && <span style={{ marginLeft: '8px' }}>⏳</span>}
+                </div>
+              </div>
+            );
+          })
+        )}
         <div ref={endRef} />
       </div>
-      <form onSubmit={send}>
-        <input value={text} onChange={e=>setText(e.target.value)} placeholder="Type a message" />
-        <button type="submit">Send</button>
+      
+      <form onSubmit={send} style={{ 
+        display: 'flex', 
+        gap: '12px', 
+        alignItems: 'flex-end',
+        background: 'var(--white)',
+        padding: '20px',
+        borderRadius: '16px',
+        boxShadow: '0 8px 32px var(--shadow)',
+        border: '1px solid var(--border-color)' 
+      }}>
+        <input 
+          value={text} 
+          onChange={e=>setText(e.target.value)} 
+          placeholder="💭 Message the group..." 
+          style={{ 
+            flex: 1, 
+            margin: 0,
+            borderRadius: '12px',
+            fontSize: '16px'
+          }}
+        />
+        <button 
+          type="submit" 
+          disabled={!text.trim()}
+          style={{ 
+            margin: 0,
+            minWidth: '80px',
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}
+        >
+          🚀 Send
+        </button>
       </form>
+      
+      {group?.members && (
+        <div className="card" style={{ marginTop: '20px' }}>
+          <h4 style={{ color: 'var(--primary-dark)', marginBottom: '15px' }}>👥 Group Members</h4>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {group.members.map((member, idx) => (
+              <span key={idx} style={{ 
+                background: 'var(--accent-light)', 
+                color: 'var(--primary-medium)', 
+                padding: '6px 12px', 
+                borderRadius: '16px', 
+                fontSize: '14px',
+                fontWeight: '500',
+                border: '1px solid var(--primary-light)'
+              }}>
+                {member.name || member.email || 'Member'}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

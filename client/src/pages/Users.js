@@ -22,26 +22,54 @@ export default function Users() {
   const sentIds = new Set((requestsSent || []).map(id => (id._id ? id._id.toString() : id.toString())));
 
   return (
-    <div>
-      <h2>All users</h2>
+    <div className="fade-in">
+      <div className="card">
+        <h2>🌟 Discover Users</h2>
+        <p className="text-light">Connect with people and start conversations</p>
+      </div>
+      
       {error && <div className="error">{error}</div>}
-      {loading && <div>Loading...</div>}
-      <ul>
+      {loading && <div className="loading">Finding amazing people...</div>}
+      
+      <div className="user-list">
         {users.filter(u => u._id !== currentUser?.id).map(u => (
-          <li key={u._id} style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <Link to={`/chat/${u._id}`}>{u.name} {u.isOnline ? '(online)' : ''}</Link>
-            {contactIds.has(u._id.toString()) ? (
-              <button disabled>Contact</button>
-            ) : sentIds.has(u._id.toString()) ? (
-              <button disabled>Requested</button>
-            ) : (
-              <button onClick={() => handleAdd(u._id)}>Add Contact</button>
-            )}
-          </li>
+          <div key={u._id} className="user-item slide-in">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <h3>
+                {u.name} 
+                {u.isOnline && <span style={{ color: '#00b894', fontSize: '12px', marginLeft: '8px' }}>● Online</span>}
+              </h3>
+              {contactIds.has(u._id.toString()) ? (
+                <button disabled style={{ opacity: 0.6, cursor: 'not-allowed' }}>✓ Contact</button>
+              ) : sentIds.has(u._id.toString()) ? (
+                <button disabled style={{ opacity: 0.6, cursor: 'not-allowed' }}>⏳ Requested</button>
+              ) : (
+                <button onClick={() => handleAdd(u._id)}>+ Add Contact</button>
+              )}
+            </div>
+            <p>Email: {u.email}</p>
+            <div style={{ marginTop: '12px' }}>
+              <Link to={`/chat/${u._id}`} style={{ 
+                display: 'inline-block', 
+                padding: '8px 16px', 
+                background: 'var(--accent-light)', 
+                borderRadius: '8px',
+                color: 'var(--primary-medium)',
+                textDecoration: 'none',
+                fontSize: '14px',
+                fontWeight: '600'
+              }}>
+                💬 Start Chat
+              </Link>
+            </div>
+          </div>
         ))}
-      </ul>
-      <div style={{ marginTop: 12 }}>
-        <Link to="/requests">Contact requests</Link> | <Link to="/contacts">My contacts</Link>
+      </div>
+      
+      <div className="card text-center" style={{ marginTop: '30px' }}>
+        <Link to="/requests" style={{ marginRight: '20px' }}>📩 Contact Requests</Link>
+        <span style={{ color: 'var(--text-light)' }}>|</span>
+        <Link to="/contacts" style={{ marginLeft: '20px' }}>👥 My Contacts</Link>
       </div>
     </div>
   );

@@ -131,27 +131,75 @@ export default function Chat({ currentUser }) {
   };
 
   return (
-    <div>
-      <h2>Chat with {other?.name || 'User'}</h2>
+    <div className="fade-in">
+      <div className="card">
+        <h2>💬 Chat with {other?.name || 'User'}</h2>
+        <p className="text-light">Have a great conversation!</p>
+      </div>
+      
       <div className="chat-window">
-        {messages.map(m => {
-          const senderId = String(m.sender?._id || m.sender);
-          const mine = senderId === String(currentUser.id || currentUser._id);
-          return (
-            <div key={m._id} className={mine ? 'msg me' : 'msg'}>
-              <div className="msg-text">{m.message}</div>
-              <div className="msg-meta">
-                {new Date(m.createdAt || m.updatedAt || Date.now()).toLocaleString()}
-                {m.pending ? ' • sending…' : ''}
+        {messages.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-light)' }}>
+            <h3>👋 Start the conversation!</h3>
+            <p>Send a message to begin chatting</p>
+          </div>
+        ) : (
+          messages.map(m => {
+            const senderId = String(m.sender?._id || m.sender);
+            const mine = senderId === String(currentUser.id || currentUser._id);
+            return (
+              <div key={m._id} className={mine ? 'msg me' : 'msg'} style={{ animationDelay: '0.1s' }}>
+                <div className="msg-text">{m.message}</div>
+                <div className="msg-meta">
+                  {new Date(m.createdAt || m.updatedAt || Date.now()).toLocaleTimeString([], { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                  })}
+                  {m.pending && <span style={{ marginLeft: '8px' }}>⏳</span>}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
         <div ref={endRef} />
       </div>
-      <form onSubmit={send}>
-        <input value={text} onChange={e=>setText(e.target.value)} placeholder="Type a message" />
-        <button type="submit">Send</button>
+      
+      <form onSubmit={send} style={{ 
+        display: 'flex', 
+        gap: '12px', 
+        alignItems: 'flex-end',
+        background: 'var(--white)',
+        padding: '20px',
+        borderRadius: '16px',
+        boxShadow: '0 8px 32px var(--shadow)',
+        border: '1px solid var(--border-color)' 
+      }}>
+        <input 
+          value={text} 
+          onChange={e=>setText(e.target.value)} 
+          placeholder="💭 Type a message..." 
+          style={{ 
+            flex: 1, 
+            margin: 0,
+            borderRadius: '12px',
+            fontSize: '16px'
+          }}
+        />
+        <button 
+          type="submit" 
+          disabled={!text.trim()}
+          style={{ 
+            margin: 0,
+            minWidth: '80px',
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}
+        >
+          ✈️ Send
+        </button>
       </form>
     </div>
   );
