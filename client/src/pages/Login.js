@@ -60,7 +60,7 @@ export default function Login({ onLogin }) {
   };
 
   return (
-    <div className="auth">
+    <div className="auth fade-in">
       <h2>Login / Quick register</h2>
       {err && <div className="error">{err}</div>}
 
