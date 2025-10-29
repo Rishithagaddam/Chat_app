@@ -289,9 +289,7 @@ router.get('/:groupId', authMiddleware, async (req, res) => {
   }
 });
 
-// ----------------------
-// Get group messages
-// ----------------------
+// Fix the get messages route syntax
 router.get('/:groupId/messages', authMiddleware, async (req, res) => {
   try {
     const { groupId } = req.params;
@@ -317,7 +315,8 @@ router.get('/:groupId/messages', authMiddleware, async (req, res) => {
         isMember,
         adminId: group.admin._id.toString(),
         members: group.members.map(m => m.user.toString())
-      });
+      }); // Add missing closing brace here
+      
       return res.status(403).json({ success: false, message: 'You are not a member of this group' });
     }
 
@@ -347,10 +346,6 @@ router.get('/:groupId/messages', authMiddleware, async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error while fetching messages' });
   }
 });
-
-// ----------------------
-// Send message to group
-// ----------------------
 router.post('/:groupId/messages', authMiddleware, async (req, res) => {
   try {
     const { groupId } = req.params;
@@ -627,6 +622,68 @@ router.put('/:groupId/name', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Update group name error:', error);
     res.status(500).json({ success: false, message: 'Server error while updating group name' });
+  }
+});
+
+// Add this route to handle adding members
+router.post('/:groupId/members', authMiddleware, async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { memberIds } = req.body;
+    const userId = req.user._id;
+
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return res.status(404).json({ success: false, message: 'Group not found' });
+    }
+
+    // Check if user is admin
+    if (group.admin.toString() !== userId.toString()) {
+      return res.status(403).json({ success: false, message: 'Only admin can add members' });
+    }
+
+    // Filter out existing members
+    const existingMemberIds = group.members.map(m => m.user.toString());
+    const newMemberIds = memberIds.filter(id => !existingMemberIds.includes(id.toString()));
+
+    // Add new members
+    const newMembers = newMemberIds.map(memberId => ({
+      user: memberId,
+      role: 'member',
+      joinedAt: new Date()
+    }));
+
+    group.members.push(...newMembers);
+    await group.save();
+
+    // Populate member details
+    const updatedGroup = await Group.findById(groupId)
+      .populate('members.user', 'name email')
+      .populate('admin', 'name email');
+
+    // Emit socket event to notify group members
+    const io = req.app.get('socketio');
+    if (io) {
+      io.to(groupId).emit('groupMembersAdded', {
+        groupId,
+        newMembers: newMembers.map(m => ({
+          _id: m.user,
+          role: m.role,
+          joinedAt: m.joinedAt
+        })),
+        addedBy: userId
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Members added successfully',
+      group: updatedGroup
+    });
+
+  } catch (error) {
+    console.error('Add members error:', error);
+    res.status(500).json({ success: false, message: 'Server error while adding members' });
   }
 });
 

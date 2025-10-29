@@ -9,9 +9,10 @@ import PollCreator from '../components/PollCreator';
 import GroupRoleManager from '../components/GroupRoleManager';
 import MediaUpload from '../components/MediaUpload';
 import MediaMessages from '../components/MediaMessages';
-
+import AddGroupMembers from '../components/AddGroupMembers';
 export default function GroupChat({ currentUser }) {
   const { id: groupId } = useParams();
+  const [showAddMembers, setShowAddMembers] = useState(false);
   const navigate = useNavigate();
   const [group, setGroup] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -818,6 +819,53 @@ export default function GroupChat({ currentUser }) {
         
         {renderTabContent()}
       </div>
+
+      {/* Add this where you show group info */}
+      {isAdmin && (
+        <button
+          onClick={() => setShowAddMembers(true)}
+          style={{
+            padding: '8px 16px',
+            background: 'var(--primary-medium)',
+            color: 'white',
+            border: 'none',
+            borderRadius: '5px',
+            cursor: 'pointer',
+            marginTop: '10px'
+          }}
+        >
+          👥 Add Members
+        </button>
+      )}
+
+      {/* Add the AddGroupMembers component modal */}
+      {isAdmin && showAddMembers && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button 
+                onClick={() => setShowAddMembers(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '20px',
+                  cursor: 'pointer'
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <AddGroupMembers 
+              groupId={groupId}
+              currentUser={currentUser}
+              onMembersAdded={(updatedGroup) => {
+                setGroup(updatedGroup);
+                setShowAddMembers(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

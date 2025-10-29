@@ -45,4 +45,12 @@ api.setToken = (token) => {
   }
 };
 
+// Add this function to your api.js
+export const addMembersToGroup = async (groupId, memberIds) => {
+  const response = await axios.post(`/api/groups/${groupId}/members`, {
+    memberIds
+  });
+  return response.data;
+};
+
 export default api;
