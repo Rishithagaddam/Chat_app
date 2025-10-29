@@ -295,35 +295,28 @@ router.get('/:groupId/messages', authMiddleware, async (req, res) => {
     const { groupId } = req.params;
     const userId = req.user._id;
 
-    console.log('Getting group messages for:', { groupId, userId: userId.toString() });
-
     // Check if group exists and user is a member
     const group = await Group.findById(groupId);
     if (!group || !group.isActive) {
-      console.log('Group not found or inactive for messages:', { found: !!group, isActive: group?.isActive });
       return res.status(404).json({ success: false, message: 'Group not found' });
     }
 
     // Check if user is member or admin
-    const isAdmin = group.admin._id.toString() === userId.toString();
-    const isMember = group.isMember(userId);
-    
-    if (!isMember && !isAdmin) {
-      console.log('User is not a member or admin of the group (messages):', { 
-        userId: userId.toString(),
-        isAdmin,
-        isMember,
-        adminId: group.admin._id.toString(),
-        members: group.members.map(m => m.user.toString())
-      }); // Add missing closing brace here
-      
+    const member = group.members.find(m => m.user.toString() === userId.toString());
+    if (!member && group.admin.toString() !== userId.toString()) {
       return res.status(403).json({ success: false, message: 'You are not a member of this group' });
     }
 
-    // Get messages for this group
-    const messages = await Message.find({ group: groupId })
-      .populate('sender', 'name email isOnline')
-      .sort({ createdAt: 1 });
+    // Get member's join date
+    const joinDate = member ? member.joinedAt : group.createdAt;
+
+    // Get messages for this group after member joined
+    const messages = await Message.find({
+      group: groupId,
+      createdAt: { $gte: joinDate }
+    })
+    .populate('sender', 'name email isOnline')
+    .sort({ createdAt: 1 });
 
     // Mark messages as read by current user
     await Message.updateMany(
@@ -646,34 +639,31 @@ router.post('/:groupId/members', authMiddleware, async (req, res) => {
     const existingMemberIds = group.members.map(m => m.user.toString());
     const newMemberIds = memberIds.filter(id => !existingMemberIds.includes(id.toString()));
 
-    // Add new members
+    // Add new members with current timestamp
+    const now = new Date();
     const newMembers = newMemberIds.map(memberId => ({
       user: memberId,
       role: 'member',
-      joinedAt: new Date()
+      joinedAt: now
     }));
 
     group.members.push(...newMembers);
     await group.save();
 
+    // Create system message about new members
+    const systemMessage = new Message({
+      sender: userId,
+      group: groupId,
+      message: `${newMembers.length} new member(s) added to the group`,
+      messageType: 'system',
+      createdAt: now
+    });
+    await systemMessage.save();
+
     // Populate member details
     const updatedGroup = await Group.findById(groupId)
       .populate('members.user', 'name email')
       .populate('admin', 'name email');
-
-    // Emit socket event to notify group members
-    const io = req.app.get('socketio');
-    if (io) {
-      io.to(groupId).emit('groupMembersAdded', {
-        groupId,
-        newMembers: newMembers.map(m => ({
-          _id: m.user,
-          role: m.role,
-          joinedAt: m.joinedAt
-        })),
-        addedBy: userId
-      });
-    }
 
     res.json({
       success: true,

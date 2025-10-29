@@ -326,7 +326,9 @@ export default function GroupChat({ currentUser }) {
               {messages.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-light)' }}>
                   <h3>🎉 Welcome to the group!</h3>
-                  <p>Start the conversation by sending a message</p>
+                  <p>You can see messages from {new Date(group.members.find(
+                    m => m.user._id === currentUser.id
+                  )?.joinedAt || group.createdAt).toLocaleString()}</p>
                 </div>
               ) : (
                 messages.map(m => {

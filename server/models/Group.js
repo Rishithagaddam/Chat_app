@@ -24,30 +24,16 @@ const groupSchema = new mongoose.Schema({
   members: [{
     user: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true
+      ref: 'User'
     },
     role: {
       type: String,
       enum: ['admin', 'moderator', 'member'],
       default: 'member'
     },
-    permissions: {
-      canSendMessages: { type: Boolean, default: true },
-      canDeleteMessages: { type: Boolean, default: false },
-      canAddMembers: { type: Boolean, default: false },
-      canRemoveMembers: { type: Boolean, default: false },
-      canEditGroup: { type: Boolean, default: false },
-      canCreatePolls: { type: Boolean, default: true },
-      canMakeAnnouncements: { type: Boolean, default: false }
-    },
     joinedAt: {
       type: Date,
       default: Date.now
-    },
-    invitedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
     }
   }],
   
