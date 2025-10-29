@@ -16,18 +16,26 @@ export default function Dashboard({ user, onLogout }) {
 
   useEffect(() => {
     // Initialize notification counts and status
-    setUnreadCount(activityService.getUnreadActivitiesCount());
-    setIsDndActive(notificationService.isDoNotDisturb());
+    const updateCounts = () => {
+      setUnreadCount(activityService.getUnreadActivitiesCount());
+      setIsDndActive(notificationService.isDoNotDisturb());
+    };
+    
+    updateCounts();
 
     // Listen for new activities
-    const handleNewActivity = () => {
-      setUnreadCount(activityService.getUnreadActivitiesCount());
+    const handleNewActivity = (event) => {
+      console.log('📋 Dashboard: New activity received', event.detail);
+      updateCounts();
     };
 
     // Check DND status periodically
     const dndInterval = setInterval(() => {
-      setIsDndActive(notificationService.isDoNotDisturb());
-    }, 30000);
+      const newDndStatus = notificationService.isDoNotDisturb();
+      if (newDndStatus !== isDndActive) {
+        setIsDndActive(newDndStatus);
+      }
+    }, 5000); // Check every 5 seconds
 
     window.addEventListener('newActivity', handleNewActivity);
 
@@ -35,7 +43,7 @@ export default function Dashboard({ user, onLogout }) {
       window.removeEventListener('newActivity', handleNewActivity);
       clearInterval(dndInterval);
     };
-  }, []);
+  }, [isDndActive]);
 
   const handleActivityCenterClose = () => {
     setShowActivityCenter(false);

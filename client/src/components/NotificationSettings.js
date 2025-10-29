@@ -29,8 +29,11 @@ const NotificationSettings = ({ isOpen, onClose }) => {
 
   const requestNotificationPermission = async () => {
     const granted = await notificationService.requestPermission();
+    console.log('🔔 Notification permission result:', granted);
     if (granted) {
       handlePreferenceChange('browserNotifications', true);
+      // Force re-render by updating permission state
+      notificationService.permission = 'granted';
     }
   };
 

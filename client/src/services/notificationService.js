@@ -4,7 +4,6 @@ class NotificationService {
     this.preferences = this.loadPreferences();
     this.doNotDisturbUntil = null;
     this.mutedChats = new Set();
-    this.init();
   }
 
   init() {
@@ -19,13 +18,25 @@ class NotificationService {
       const dndTime = new Date(dndUntil);
       if (dndTime > new Date()) {
         this.doNotDisturbUntil = dndTime;
+      } else {
+        localStorage.removeItem('dndUntil');
       }
     }
 
     const mutedChats = localStorage.getItem('mutedChats');
     if (mutedChats) {
-      this.mutedChats = new Set(JSON.parse(mutedChats));
+      try {
+        this.mutedChats = new Set(JSON.parse(mutedChats));
+      } catch (e) {
+        this.mutedChats = new Set();
+      }
     }
+
+    console.log('🔔 NotificationService initialized', {
+      permission: this.permission,
+      preferences: this.preferences,
+      isDND: this.isDoNotDisturb()
+    });
   }
 
   loadPreferences() {
@@ -161,16 +172,32 @@ class NotificationService {
 
   // Notification methods for different events
   newMessage(senderName, message, chatId, isGroup = false) {
+    console.log('🔔 NotificationService: New message notification', {
+      senderName, 
+      message: message.text || 'media',
+      chatId, 
+      isGroup,
+      shouldShow: this.shouldShowNotification(isGroup ? 'group' : 'message', chatId)
+    });
+    
     const type = isGroup ? 'group' : 'message';
     const title = isGroup ? `${senderName} in group` : senderName;
     
     this.showNotification(title, {
       body: message.text || 'Sent a file',
-      data: { chatId, messageId: message._id }
+      data: { chatId, messageId: message._id },
+      icon: '/favicon.ico'
     }, chatId, type);
   }
 
   mediaShared(senderName, mediaType, chatId, isGroup = false) {
+    console.log('🔔 NotificationService: Media shared notification', {
+      senderName, 
+      mediaType, 
+      chatId, 
+      isGroup
+    });
+    
     const title = isGroup ? `${senderName} in group` : senderName;
     const mediaTypeText = {
       image: 'photo',
@@ -181,7 +208,8 @@ class NotificationService {
     
     this.showNotification(title, {
       body: `Shared a ${mediaTypeText[mediaType] || 'file'}`,
-      data: { chatId, type: 'media' }
+      data: { chatId, type: 'media' },
+      icon: '/favicon.ico'
     }, chatId, 'media');
   }
 

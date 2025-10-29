@@ -33,16 +33,27 @@ function App() {
     if (token) {
       connectSocket(token);
       s = getSocket();
+      
+      // Make socket available globally for services
+      window.socket = s;
+      
+      // Initialize services after socket is available
+      notificationService.init();
+      activityService.init();
+      
       // listen for contact events and refresh lists
       if (s) {
         s.on('contactRequest', (payload) => {
+          console.log('📬 App: Contact request received', payload);
           // payload: { toUserId, from: { id, name, email } }
           const currentUserId = user?.id || user?._id;
           if (payload?.toUserId && String(payload.toUserId) === String(currentUserId)) {
             dispatch(fetchRequests());
           }
         });
+        
         s.on('contactAccepted', () => {
+          console.log('✅ App: Contact accepted');
           dispatch(fetchContacts());
           dispatch(fetchRequests());
         });
@@ -93,6 +104,7 @@ function App() {
       }
     } else {
       disconnectSocket();
+      window.socket = null;
     }
 
     return () => {
@@ -106,14 +118,9 @@ function App() {
         s.off('requestWithdrawn');
       }
       disconnectSocket();
+      window.socket = null;
     };
   }, [token, user, dispatch]);
-
-  useEffect(() => {
-    // Initialize notification services
-    notificationService.init();
-    activityService.init();
-  }, []);
 
   const handleLogin = ({ token, user }) => {
     localStorage.setItem('token', token);

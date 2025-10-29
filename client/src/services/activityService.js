@@ -1,10 +1,12 @@
 import api from '../api';
+import notificationService from './notificationService';
 
 class ActivityService {
   constructor() {
     this.activities = [];
     this.lastSeenTimes = new Map();
     this.userStatuses = new Map();
+    this.socket = null;
     this.init();
   }
 
@@ -21,8 +23,158 @@ class ActivityService {
     // Track page visibility for accurate last seen
     this.trackPageVisibility();
 
-    // Listen for real-time events to create dynamic notifications
-    this.setupRealtimeListeners();
+    // Setup socket listeners when available
+    this.setupSocketListeners();
+  }
+
+  setupSocketListeners() {
+    // Check for socket periodically since it might not be available immediately
+    const checkSocket = () => {
+      if (window.socket && window.socket !== this.socket) {
+        this.socket = window.socket;
+        this.attachSocketEvents();
+      }
+    };
+
+    // Check immediately and then periodically
+    checkSocket();
+    setInterval(checkSocket, 1000);
+  }
+
+  attachSocketEvents() {
+    if (!this.socket) return;
+
+    console.log('🔔 ActivityService: Attaching socket events');
+
+    // Remove existing listeners to prevent duplicates
+    this.socket.off('receiveMessage');
+    this.socket.off('receiveGroupMessage');
+    this.socket.off('contactRequest');
+    this.socket.off('contactAccepted');
+    this.socket.off('userOnline');
+    this.socket.off('userOffline');
+
+    // Listen for incoming messages
+    this.socket.on('receiveMessage', (data) => {
+      console.log('🔔 ActivityService: Received message event', data);
+      const msg = data.message || data;
+      if (msg && msg.sender) {
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const senderId = String(msg.sender._id || msg.sender.id);
+        const currentUserId = String(currentUser._id || currentUser.id);
+        
+        // Only log if message is not from current user
+        if (senderId !== currentUserId) {
+          this.messageReceived(
+            senderId,
+            msg.sender.name || 'Unknown User',
+            msg.receiver?._id || msg.receiver,
+            false
+          );
+          
+          // Show browser notification
+          notificationService.newMessage(
+            msg.sender.name || 'Unknown User',
+            { text: msg.message || 'Sent a file', _id: msg._id },
+            msg.receiver?._id || msg.receiver,
+            false
+          );
+        }
+      }
+    });
+
+    // Listen for group messages
+    this.socket.on('receiveGroupMessage', (data) => {
+      console.log('🔔 ActivityService: Received group message event', data);
+      if (data.message && data.message.sender) {
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const senderId = String(data.message.sender._id || data.message.sender.id);
+        const currentUserId = String(currentUser._id || currentUser.id);
+        
+        // Only log if message is not from current user
+        if (senderId !== currentUserId) {
+          this.messageReceived(
+            senderId,
+            data.message.sender.name || 'Unknown User',
+            data.groupId,
+            true
+          );
+          
+          // Show browser notification
+          notificationService.newMessage(
+            data.message.sender.name || 'Unknown User',
+            { text: data.message.message || 'Sent a file', _id: data.message._id },
+            data.groupId,
+            true
+          );
+        }
+      }
+    });
+
+    // Listen for contact requests
+    this.socket.on('contactRequest', (data) => {
+      console.log('🔔 ActivityService: Received contact request event', data);
+      if (data.from) {
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const currentUserId = String(currentUser._id || currentUser.id);
+        
+        // Only log if request is for current user
+        if (String(data.toUserId) === currentUserId) {
+          this.contactRequestReceived(
+            data.from.id || data.from._id,
+            data.from.name || 'Unknown User'
+          );
+          
+          // Show browser notification
+          notificationService.showNotification(
+            'New Contact Request',
+            {
+              body: `${data.from.name} wants to connect with you`,
+              data: { type: 'contact_request', fromId: data.from.id }
+            },
+            data.from.id,
+            'message'
+          );
+        }
+      }
+    });
+
+    // Listen for accepted contacts
+    this.socket.on('contactAccepted', (data) => {
+      console.log('🔔 ActivityService: Contact accepted event', data);
+      if (data.user) {
+        this.contactRequestAccepted(
+          data.user.id || data.user._id,
+          data.user.name || 'Unknown User'
+        );
+        
+        // Show browser notification
+        notificationService.showNotification(
+          'Contact Request Accepted',
+          {
+            body: `${data.user.name} accepted your contact request`,
+            data: { type: 'contact_accepted', userId: data.user.id }
+          },
+          data.user.id,
+          'message'
+        );
+      }
+    });
+
+    // Listen for user status changes
+    this.socket.on('userOnline', (data) => {
+      if (data.user) {
+        this.updateLastSeen(data.user.id, new Date());
+        this.userStatuses.set(data.user.id, 'online');
+      }
+    });
+
+    this.socket.on('userOffline', (data) => {
+      if (data.user) {
+        this.updateLastSeen(data.user.id, new Date(data.lastSeen || Date.now()));
+        this.userStatuses.set(data.user.id, 'offline');
+      }
+    });
   }
 
   startStatusUpdater() {
@@ -76,6 +228,8 @@ class ActivityService {
 
     this.saveActivities();
     this.notifyActivityListeners(activity);
+    
+    console.log('🔔 ActivityService: New activity logged', activity);
   }
 
   saveActivities() {
@@ -86,70 +240,9 @@ class ActivityService {
     window.dispatchEvent(new CustomEvent('newActivity', { detail: activity }));
   }
 
-  setupRealtimeListeners() {
-    // Listen for socket events if available
-    if (window.socket) {
-      window.socket.on('receiveMessage', (data) => {
-        const msg = data.message || data;
-        if (msg && msg.sender) {
-          this.messageReceived(
-            msg.sender._id,
-            msg.sender.name,
-            msg.receiver?._id || msg.group,
-            !!msg.group
-          );
-        }
-      });
-
-      window.socket.on('receiveGroupMessage', (data) => {
-        if (data.message && data.message.sender) {
-          this.messageReceived(
-            data.message.sender._id,
-            data.message.sender.name,
-            data.groupId,
-            true
-          );
-        }
-      });
-
-      window.socket.on('contactRequest', (data) => {
-        if (data.from) {
-          this.logActivity('contact_request_received', {
-            fromUserId: data.from.id,
-            fromUserName: data.from.name,
-            timestamp: new Date()
-          });
-        }
-      });
-
-      window.socket.on('contactAccepted', (data) => {
-        if (data.user) {
-          this.logActivity('contact_accepted', {
-            userId: data.user.id,
-            userName: data.user.name,
-            timestamp: new Date()
-          });
-        }
-      });
-    }
-
-    // Listen for media upload events
-    window.addEventListener('refreshGroupMedia', (event) => {
-      if (event.detail.mediaType && event.detail.userName) {
-        this.mediaShared(
-          event.detail.userId,
-          event.detail.userName,
-          event.detail.groupId,
-          event.detail.mediaType,
-          event.detail.fileName
-        );
-      }
-    });
-  }
-
   // Activity logging methods
   messageReceived(senderId, senderName, chatId, isGroup = false) {
-    const currentUser = JSON.parse(localStorage.getItem('user'));
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
     // Don't log our own messages
     if (currentUser && String(senderId) === String(currentUser._id || currentUser.id)) {
       return;
