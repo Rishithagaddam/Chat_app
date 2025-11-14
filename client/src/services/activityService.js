@@ -178,36 +178,25 @@ class ActivityService {
   }
 
   startStatusUpdater() {
-    // Update status every 30 seconds
-    setInterval(() => {
-      this.updateUserStatus('online');
-    }, 30000);
-
-    // Initial status update
-    this.updateUserStatus('online');
+    // User status is now handled by socket connection, not by periodic API calls
+    // No need to update status via API since socket.io handles this automatically
   }
 
   trackPageVisibility() {
+    // Track page visibility but don't make API calls
+    // Socket connection handles online/offline status automatically
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
-        this.updateUserStatus('away');
+        console.log('Page hidden - socket will handle status');
       } else {
-        this.updateUserStatus('online');
+        console.log('Page visible - socket will handle status');
       }
     });
 
-    // Handle page unload
+    // Handle page unload - socket disconnect will handle this
     window.addEventListener('beforeunload', () => {
-      this.updateUserStatus('offline');
+      console.log('Page unloading - socket disconnect will handle status');
     });
-  }
-
-  async updateUserStatus(status) {
-    try {
-      await api.post('/user/status', { status, timestamp: new Date() });
-    } catch (error) {
-      console.error('Failed to update user status:', error);
-    }
   }
 
   logActivity(type, data) {

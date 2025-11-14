@@ -1,11 +1,11 @@
 const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
 const http = require('http');
 const socketIo = require('socket.io');
-const cors = require('cors');
-const dotenv = require('dotenv');
+require('dotenv').config();
 
 // Import configurations and utilities
-const connectDB = require('./config/database');
 const { handleConnection } = require('./config/socket');
 const authMiddleware = require('./middleware/authMiddleware');
 
@@ -19,12 +19,6 @@ const pollRoutes = require('./routes/polls');
 const announcementRoutes = require('./routes/announcements');
 const mediaRoutes = require('./routes/media');
 const profileRoutes = require('./routes/profile');
-
-// Load environment variables
-dotenv.config();
-
-// Connect to MongoDB
-connectDB();
 
 // Create Express app
 const app = express();
@@ -51,6 +45,90 @@ app.use(cors({
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// MongoDB connection with better error handling
+const connectDB = async () => {
+  try {
+    // Default to local MongoDB if no URI provided
+    const mongoURI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/chatapp';
+    
+    console.log('🔄 Connecting to MongoDB...');
+    console.log(`📍 URI: ${mongoURI.includes('@') ? mongoURI.split('@')[1] : mongoURI}`);
+    
+    const options = {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+    };
+    
+    await mongoose.connect(mongoURI, options);
+    
+    console.log('✅ MongoDB connected successfully');
+    console.log(`📍 Connected to: ${mongoose.connection.host}`);
+    console.log(`📊 Database: ${mongoose.connection.name}`);
+  } catch (error) {
+    console.error('❌ MongoDB connection error:', error.message);
+    console.error('\n💡 Troubleshooting Steps:');
+    
+    if (error.message.includes('Atlas')) {
+      console.error('   🌐 MongoDB Atlas Issue:');
+      console.error('   1. Go to https://cloud.mongodb.com');
+      console.error('   2. Navigate to: Network Access → IP Access List');
+      console.error('   3. Click "Add IP Address"');
+      console.error('   4. Either add your current IP or use 0.0.0.0/0 (allow all - dev only)');
+      console.error('   5. Wait 2-3 minutes for changes to propagate');
+      console.error('\n   OR switch to local MongoDB:');
+      console.error('   1. Install MongoDB locally: https://www.mongodb.com/try/download/community');
+      console.error('   2. Update .env: MONGODB_URI=mongodb://127.0.0.1:27017/chatapp');
+    } else if (error.message.includes('ECONNREFUSED')) {
+      console.error('   🔧 Local MongoDB Issue:');
+      console.error('   1. Make sure MongoDB is installed');
+      console.error('   2. Start MongoDB service:');
+      console.error('      Windows: net start MongoDB (as admin)');
+      console.error('      Mac: brew services start mongodb-community');
+      console.error('      Linux: sudo systemctl start mongod');
+      console.error('   3. Or run: mongod --dbpath=/path/to/data');
+    } else {
+      console.error('   ⚠️  General MongoDB Issue:');
+      console.error('   - Check your MONGODB_URI in .env file');
+      console.error('   - Ensure MongoDB is running');
+      console.error('   - Verify your credentials (if using Atlas)');
+    }
+    
+    console.error('\n🔄 Attempting to use fallback local connection...');
+    
+    // Try fallback to local MongoDB
+    if (process.env.MONGODB_URI !== 'mongodb://127.0.0.1:27017/chatapp') {
+      try {
+        await mongoose.connect('mongodb://127.0.0.1:27017/chatapp', {
+          useNewUrlParser: true,
+          useUnifiedTopology: true,
+          serverSelectionTimeoutMS: 3000,
+        });
+        console.log('✅ Connected to fallback local MongoDB');
+        return;
+      } catch (fallbackError) {
+        console.error('❌ Fallback connection also failed');
+      }
+    }
+    
+    console.error('\n💥 Unable to connect to any MongoDB instance. Exiting...\n');
+    process.exit(1);
+  }
+};
+
+// Handle MongoDB connection events
+mongoose.connection.on('disconnected', () => {
+  console.log('⚠️  MongoDB disconnected');
+});
+
+mongoose.connection.on('error', (err) => {
+  console.error('❌ MongoDB connection error:', err);
+});
+
+// Connect to database
+connectDB();
 
 // Test route
 app.get('/api/test-server', (req, res) => {
